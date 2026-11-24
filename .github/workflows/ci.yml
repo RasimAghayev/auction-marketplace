@@ -3,8 +3,19 @@ name: CI
 on:
   push:
     branches: [master, main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'infra/**'
+      - '.github/workflows/**'
   pull_request:
     branches: [master, main]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'infra/**'
+      - '.github/workflows/**'
+  workflow_dispatch:
 
 jobs:
   backend-tests:
@@ -54,3 +65,4 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npx vite build
+
