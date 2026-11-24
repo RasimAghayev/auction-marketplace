@@ -4,6 +4,6 @@ up:
 down:
 	docker compose -f infra/compose.yaml down
 test:
-	cd backend && php artisan test
+	docker compose -f infra/compose.yaml exec backend php artisan test
 lint:
-	cd backend && ./vendor/bin/pint
+	docker compose -f infra/compose.yaml exec backend ./vendor/bin/pint
