@@ -1,6 +1,6 @@
 # Auction Marketplace
 
-A distributed, production-ready online auction marketplace built with Laravel 12, Vue.js 3, MongoDB, and Redis.
+A distributed, production-ready online auction marketplace built with Laravel 13, Vue.js 3, MongoDB, and Redis.
 
 ## Features
 
@@ -16,7 +16,7 @@ A distributed, production-ready online auction marketplace built with Laravel 12
 
 ### Backend
 - PHP 8.3+
-- Laravel 12+
+- Laravel 13+
 - MongoDB (primary database)
 - Redis (caching, queues, real-time coordination)
 - Laravel Reverb (WebSockets)
