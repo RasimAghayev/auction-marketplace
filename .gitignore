@@ -1,0 +1,62 @@
+# Dependencies
+vendor/
+node_modules/
+
+# Build outputs
+backend/bootstrap/cache/*.php
+backend/storage/framework/cache/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+backend/storage/logs/*.log
+frontend/dist/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Secrets (NEVER commit)
+secrets/*.txt
+secrets/*.key
+secrets/*.pem
+secrets/*.crt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+backend/storage/framework/testing/
+.coverage/
+.phpunit.result.cache
+
+# Cache
+.php-cs-fixer.cache
+.eslintcache
+.pest.php
+
+# Database
+*.sqlite
+*.sqlite3
+
+# Misc
+*.backup
+*.bak
+*.orig

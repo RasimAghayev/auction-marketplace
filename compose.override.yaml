@@ -1,0 +1,136 @@
+# Development override - auto-loaded by `docker compose up`
+# Contains: watch mode, bind mounts, debug settings, extra ports
+
+services:
+  # Backend with hot reload
+  backend:
+    build:
+      target: dev
+    image: ${REGISTRY:-local}/auction-backend:dev
+    read_only: false  # Required for sync action
+    command: php-fpm
+    environment:
+      - APP_DEBUG=true
+      - LOG_LEVEL=debug
+    volumes:
+      - ./backend:/var/www/html:cached
+    develop:
+      watch:
+        # Sync PHP source files - Laravel auto-reloads
+        - action: sync
+          path: ./backend/app
+          target: /var/www/html/app
+          ignore:
+            - "*/Tests/*"
+            - "*/tests/*"
+        - action: sync
+          path: ./backend/config
+          target: /var/www/html/config
+        - action: sync
+          path: ./backend/routes
+          target: /var/www/html/routes
+        # Sync and restart on config changes
+        - action: sync+restart
+          path: ./backend/.env
+          target: /var/www/html/.env
+        # Rebuild on composer changes
+        - action: rebuild
+          path: ./backend/composer.json
+        - action: rebuild
+          path: ./backend/composer.lock
+
+  # Reverb with hot reload
+  reverb:
+    build:
+      target: dev
+    image: ${REGISTRY:-local}/auction-reverb:dev
+    read_only: false
+    command: php artisan reverb:start --host=0.0.0.0 --port=8081 --debug
+    develop:
+      watch:
+        - action: sync
+          path: ./backend/app
+          target: /var/www/html/app
+        - action: sync+restart
+          path: ./backend/config/broadcasting.php
+          target: /var/www/html/config/broadcasting.php
+        - action: sync+restart
+          path: ./backend/config/reverb.php
+          target: /var/www/html/config/reverb.php
+
+  # Queue worker - dev mode with sync
+  queue-worker:
+    build:
+      target: dev
+    image: ${REGISTRY:-local}/auction-queue:dev
+    read_only: false
+    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600 --memory=256 --verbose
+    deploy:
+      replicas: 1
+    develop:
+      watch:
+        - action: sync
+          path: ./backend/app
+          target: /var/www/html/app
+        - action: sync
+          path: ./backend/config
+          target: /var/www/html/config
+
+  # Scheduler - dev mode
+  scheduler:
+    build:
+      target: dev
+    image: ${REGISTRY:-local}/auction-scheduler:dev
+    read_only: false
+    develop:
+      watch:
+        - action: sync
+          path: ./backend/app/Console
+          target: /var/www/html/app/Console
+        - action: sync+restart
+          path: ./backend/app/Console/Kernel.php
+          target: /var/www/html/app/Console/Kernel.php
+
+  # Frontend with Vite HMR
+  frontend:
+    build:
+      target: builder
+    image: ${REGISTRY:-local}/auction-frontend:dev
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    volumes:
+      - ./frontend:/app:cached
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    develop:
+      watch:
+        # Vite HMR handles sync automatically via dev server
+        - action: rebuild
+          path: ./frontend/package.json
+        - action: rebuild
+          path: ./frontend/package-lock.json
+        - action: rebuild
+          path: ./frontend/vite.config.ts
+        - action: rebuild
+          path: ./frontend/tailwind.config.js
+
+  # Nginx - dev config with extra ports
+  nginx:
+    volumes:
+      - ./docker/nginx/dev.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+      - "443:443"
+
+  # MongoDB Express for debugging
+  mongo-express:
+    profiles: ["debug"]
+
+  # Redis Commander for debugging
+  redis-commander:
+    profiles: ["debug"]
+
+# Override networks for development (remove internal restriction)
+networks:
+  backend-internal:
+    internal: false

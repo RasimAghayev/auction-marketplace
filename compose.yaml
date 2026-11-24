@@ -1,0 +1,849 @@
+# Base configuration - production-ready
+# No version field (deprecated since Compose v2)
+# Use: docker compose -f compose.yaml -f compose.prod.yaml up -d
+
+services:
+  # ============================================================
+  # INFRASTRUCTURE SERVICES
+  # ============================================================
+
+  mongodb:
+    image: mongo:8.0
+    container_name: auction-mongodb
+    profiles: ["core"]
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME_FILE=/run/secrets/mongodb_root_username
+      - MONGO_INITDB_ROOT_PASSWORD_FILE=/run/secrets/mongodb_root_password
+      - MONGO_INITDB_DATABASE=${MONGODB_DATABASE:-auction_marketplace}
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongodb/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - backend-internal
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+        reservations:
+          memory: 512M
+          cpus: "0.5"
+    secrets:
+      - mongodb_root_username
+      - mongodb_root_password
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:8.0-alpine
+    container_name: auction-redis
+    profiles: ["core"]
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - backend-internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================
+  # APPLICATION SERVICES
+  # ============================================================
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/php/Dockerfile
+      target: prod
+      args:
+        - UID=1000
+        - GID=1000
+    image: ${REGISTRY:-local}/auction-backend:${TAG:-latest}
+    profiles: ["core"]
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_URL=${APP_URL:-http://localhost}
+      - APP_KEY=base64:5tHlvpjXZZ6E5WHImfqNWTp+xI9I3DeLpaT0kUdHNmE=
+      - DB_CONNECTION=mongodb
+      - MONGODB_URI=${MONGODB_URI:-mongodb://admin:f841mu3Nmi1cUZme755cX%2FTCWyB13ZeHoohRUe3WqmQ%3D@mongodb:27017/?authSource=admin}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-auction_marketplace}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      - REDIS_PORT=6379
+      - REVERB_HOST=reverb
+      - REVERB_PORT=8081
+      - REVERB_SCHEME=http
+      - QUEUE_CONNECTION=redis
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=redis
+    volumes:
+      - ./backend/storage:/var/www/html/storage:rw
+      - ./backend/bootstrap/cache:/var/www/html/bootstrap/cache:rw
+    networks:
+      - backend-internal
+      - frontend-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+        restart: true
+      redis:
+        condition: service_healthy
+        restart: true
+    healthcheck:
+      test: ["CMD-SHELL", "php -r \"echo 'OK';\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "2.0"
+        reservations:
+          memory: 512M
+          cpus: "1.0"
+      replicas: 2
+    secrets:
+      - redis_password
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  reverb:
+    build:
+      context: ./backend
+      dockerfile: ../docker/php/Dockerfile
+      target: prod
+    image: ${REGISTRY:-local}/auction-reverb:${TAG:-latest}
+    container_name: auction-reverb
+    profiles: ["core"]
+    command: php artisan reverb:start --host=0.0.0.0 --port=8081
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - REVERB_HOST=0.0.0.0
+      - REVERB_PORT=8081
+      - REVERB_SCHEME=http
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      - REDIS_PORT=6379
+    networks:
+      - backend-internal
+      - frontend-network
+    depends_on:
+      redis:
+        condition: service_healthy
+        restart: true
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8081 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+          cpus: "0.5"
+    secrets:
+      - redis_password
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  queue-worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/php/Dockerfile
+      target: prod
+    image: ${REGISTRY:-local}/auction-queue:${TAG:-latest}
+    profiles: ["core", "workers"]
+    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600 --memory=256
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_KEY=base64:5tHlvpjXZZ6E5WHImfqNWTp+xI9I3DeLpaT0kUdHNmE=
+      - DB_CONNECTION=mongodb
+      - MONGODB_URI=${MONGODB_URI:-mongodb://admin:f841mu3Nmi1cUZme755cX%2FTCWyB13ZeHoohRUe3WqmQ%3D@mongodb:27017/?authSource=admin}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-auction_marketplace}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=redis
+    networks:
+      - backend-internal
+    depends_on:
+      mongodb:
+        condition: service_healthy
+        restart: true
+      redis:
+        condition: service_healthy
+        restart: true
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+          cpus: "0.5"
+      replicas: 3
+    secrets:
+      - redis_password
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: ../docker/php/Dockerfile
+      target: prod
+    image: ${REGISTRY:-local}/auction-scheduler:${TAG:-latest}
+    container_name: auction-scheduler
+    profiles: ["core"]
+    command: php artisan schedule:work
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_KEY=base64:5tHlvpjXZZ6E5WHImfqNWTp+xI9I3DeLpaT0kUdHNmE=
+      - DB_CONNECTION=mongodb
+      - MONGODB_URI=${MONGODB_URI:-mongodb://admin:f841mu3Nmi1cUZme755cX%2FTCWyB13ZeHoohRUe3WqmQ%3D@mongodb:27017/?authSource=admin}
+      - MONGODB_DATABASE=${MONGODB_DATABASE:-auction_marketplace}
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      - REDIS_PORT=6379
+    networks:
+      - backend-internal
+    depends_on:
+      mongodb:
+        condition: service_healthy
+        restart: true
+      redis:
+        condition: service_healthy
+        restart: true
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+        reservations:
+          memory: 128M
+          cpus: "0.25"
+    secrets:
+      - redis_password
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================
+  # FRONTEND & PROXY
+  # ============================================================
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+      target: production
+    image: ${REGISTRY:-local}/auction-frontend:${TAG:-latest}
+    container_name: auction-frontend
+    profiles: ["core"]
+    networks:
+      - frontend-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:1.31-alpine
+    container_name: auction-nginx
+    profiles: ["core"]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./backend/public:/var/www/html/public:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    networks:
+      - frontend-network
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+        reservations:
+          memory: 128M
+          cpus: "0.25"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ============================================================
+  # OPTIONAL SERVICES (Profiles)
+  # ============================================================
+
+  # MongoDB Express - database admin UI (debug profile)
+  mongo-express:
+    image: mongo-express:1.0-alpine
+    container_name: auction-mongo-express
+    profiles: ["debug", "admin"]
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME_FILE=/run/secrets/mongodb_root_username
+      - ME_CONFIG_MONGODB_ADMINPASSWORD_FILE=/run/secrets/mongodb_root_password
+      - ME_CONFIG_MONGODB_URL=mongodb://mongodb:27017
+      - ME_CONFIG_BASICAUTH_USERNAME_FILE=/run/secrets/mongo_express_user
+      - ME_CONFIG_BASICAUTH_PASSWORD_FILE=/run/secrets/mongo_express_password
+    ports:
+      - "8081:8081"
+    networks:
+      - backend-internal
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+    secrets:
+      - mongodb_root_username
+      - mongodb_root_password
+      - mongo_express_user
+      - mongo_express_password
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis Commander - Redis admin UI (debug profile)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: auction-redis-commander
+    profiles: ["debug", "admin"]
+    environment:
+      - REDIS_HOSTS=local:redis:6379:0:redis_password
+      - HTTP_USER_FILE=/run/secrets/redis_commander_user
+      - HTTP_PASSWORD_FILE=/run/secrets/redis_commander_password
+    ports:
+      - "8082:8081"
+    networks:
+      - backend-internal
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+    secrets:
+      - redis_commander_user
+      - redis_commander_password
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Prometheus metrics (monitoring profile)
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: auction-prometheus
+    profiles: ["monitoring"]
+    volumes:
+      - ./docker/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    networks:
+      - backend-internal
+      - frontend-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Grafana dashboards (monitoring profile)
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: auction-grafana
+    profiles: ["monitoring"]
+    environment:
+      - GF_SECURITY_ADMIN_USER_FILE=/run/secrets/grafana_admin_user
+      - GF_SECURITY_ADMIN_PASSWORD_FILE=/run/secrets/grafana_admin_password
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - ./docker/monitoring/grafana:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - frontend-network
+    depends_on:
+      prometheus:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
+    secrets:
+      - grafana_admin_user
+      - grafana_admin_password
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Log aggregation - Loki (monitoring profile)
+  loki:
+    image: grafana/loki:3.1.0
+    container_name: auction-loki
+    profiles: ["monitoring"]
+    volumes:
+      - ./docker/monitoring/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - backend-internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Promtail for log collection (monitoring profile)
+  promtail:
+    image: grafana/promtail:3.1.0
+    container_name: auction-promtail
+    profiles: ["monitoring"]
+    volumes:
+      - ./docker/monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+    networks:
+      - backend-internal
+    depends_on:
+      loki:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Development test runner (testing profile)
+  test-runner:
+    build:
+      context: ./backend
+      dockerfile: ../docker/php/Dockerfile
+      target: dev
+    image: ${REGISTRY:-local}/auction-test:${TAG:-latest}
+    container_name: auction-test-runner
+    profiles: ["testing"]
+    command: php artisan test --coverage
+    environment:
+      - APP_ENV=testing
+      - APP_DEBUG=true
+      - DB_CONNECTION=mongodb
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017}
+      - MONGODB_DATABASE=auction_marketplace_test
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=redis
+      - CACHE_DRIVER=redis
+    volumes:
+      - ./backend:/var/www/html
+    networks:
+      - backend-internal
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    secrets:
+      - redis_password
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "2.0"
+
+  # Backend unit/feature test runner (testing profile)
+  test-backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/php/Dockerfile
+      target: dev
+    image: ${REGISTRY:-local}/auction-test-backend:${TAG:-latest}
+    container_name: auction-test-backend
+    profiles: ["testing", "backend-test"]
+    command: >
+      sh -c "composer install --no-interaction && php artisan test --parallel"
+    environment:
+      - APP_ENV=testing
+      - APP_DEBUG=true
+      - DB_CONNECTION=mongodb
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017}
+      - MONGODB_DATABASE=auction_marketplace_test
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=sync
+      - CACHE_DRIVER=array
+    volumes:
+      - ./backend:/var/www/html
+      - ./backend/tests:/var/www/html/tests:ro
+    networks:
+      - backend-internal
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    secrets:
+      - redis_password
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+
+  # Backend BDD test runner (testing profile)
+  test-bdd:
+    build:
+      context: ./backend
+      dockerfile: ../docker/php/Dockerfile
+      target: dev
+    image: ${REGISTRY:-local}/auction-test-bdd:${TAG:-latest}
+    container_name: auction-test-bdd
+    profiles: ["testing", "bdd-test"]
+    command: >
+      sh -c "composer install --no-interaction && php artisan test tests/BDD --parallel"
+    environment:
+      - APP_ENV=testing
+      - APP_DEBUG=true
+      - DB_CONNECTION=mongodb
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017}
+      - MONGODB_DATABASE=auction_marketplace_test
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=sync
+      - CACHE_DRIVER=array
+    volumes:
+      - ./backend:/var/www/html
+      - ./backend/tests/BDD:/var/www/html/tests/BDD:ro
+    networks:
+      - backend-internal
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    secrets:
+      - redis_password
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
+  # ATDD test runner (testing profile)
+  test-atdd:
+    build:
+      context: ./backend
+      dockerfile: ../docker/php/Dockerfile
+      target: dev
+    image: ${REGISTRY:-local}/auction-test-atdd:${TAG:-latest}
+    container_name: auction-test-atdd
+    profiles: ["testing", "atdd-test"]
+    command: >
+      sh -c "composer install --no-interaction && php artisan test tests/ATDD --parallel"
+    environment:
+      - APP_ENV=testing
+      - APP_DEBUG=true
+      - DB_CONNECTION=mongodb
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017}
+      - MONGODB_DATABASE=auction_marketplace_test
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      - REDIS_PORT=6379
+      - QUEUE_CONNECTION=sync
+      - CACHE_DRIVER=array
+    volumes:
+      - ./backend:/var/www/html
+      - ./backend/tests/ATDD:/var/www/html/tests/ATDD:ro
+    networks:
+      - backend-internal
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    secrets:
+      - redis_password
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+
+  # Frontend test runner (testing profile)
+  test-frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+      target: dev
+    image: ${REGISTRY:-local}/auction-test-frontend:${TAG:-latest}
+    container_name: auction-test-frontend
+    profiles: ["testing", "frontend-test"]
+    command: >
+      sh -c "npm install && npm run test:unit -- --run"
+    environment:
+      - NODE_ENV=test
+      - VITEST_POOL=forks
+    volumes:
+      - ./frontend:/app
+      - ./frontend/tests:/app/tests:ro
+    networks:
+      - frontend-network
+    depends_on:
+      frontend:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+
+  # Playwright E2E test runner (testing profile)
+  test-e2e:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+      target: dev
+    image: ${REGISTRY:-local}/auction-test-e2e:${TAG:-latest}
+    container_name: auction-test-e2e
+    profiles: ["testing", "e2e-test"]
+    command: >
+      sh -c "npm install && npx playwright install --with-deps chromium && npm run test:e2e"
+    environment:
+      - NODE_ENV=test
+      - PLAYWRIGHT_BASE_URL=http://frontend:5173
+      - API_BASE_URL=http://backend:9000/api
+    volumes:
+      - ./frontend:/app
+      - ./frontend/tests/e2e:/app/tests/e2e:ro
+    networks:
+      - frontend-network
+      - backend-internal
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+
+  # Playwright API test runner (testing profile)
+  test-api:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+      target: dev
+    image: ${REGISTRY:-local}/auction-test-api:${TAG:-latest}
+    container_name: auction-test-api
+    profiles: ["testing", "api-test"]
+    command: >
+      sh -c "npm install && npx playwright install --with-deps chromium && npm run test:api"
+    environment:
+      - NODE_ENV=test
+      - API_BASE_URL=http://backend:9000/api
+    volumes:
+      - ./frontend:/app
+      - ./frontend/tests/e2e:/app/tests/e2e:ro
+    networks:
+      - backend-internal
+    depends_on:
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.0"
+
+# ============================================================
+# NETWORKS - Segmented for security
+# ============================================================
+
+networks:
+  frontend-network:
+    name: auction-frontend
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+
+  backend-internal:
+    name: auction-backend
+    driver: bridge
+    internal: true  # No external access - database, redis, workers
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+
+# ============================================================
+# VOLUMES - Named volumes for persistence
+# ============================================================
+
+volumes:
+  mongodb_data:
+    name: auction-mongodb-data
+    driver: local
+  redis_data:
+    name: auction-redis-data
+    driver: local
+  prometheus_data:
+    name: auction-prometheus-data
+    driver: local
+  grafana_data:
+    name: auction-grafana-data
+    driver: local
+  loki_data:
+    name: auction-loki-data
+    driver: local
+
+# ============================================================
+# SECRETS - External secret files (never in repo)
+# ============================================================
+
+secrets:
+  mongodb_root_username:
+    file: ./secrets/mongodb_root_username.txt
+  mongodb_root_password:
+    file: ./secrets/mongodb_root_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  mongo_express_user:
+    file: ./secrets/mongo_express_user.txt
+  mongo_express_password:
+    file: ./secrets/mongo_express_password.txt
+  redis_commander_user:
+    file: ./secrets/redis_commander_user.txt
+  redis_commander_password:
+    file: ./secrets/redis_commander_password.txt
+  grafana_admin_user:
+    file: ./secrets/grafana_admin_user.txt
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt

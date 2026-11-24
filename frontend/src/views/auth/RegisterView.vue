@@ -1,0 +1,149 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { useAppToast } from '@/composables/useToast'
+import { RouterLink } from 'vue-router'
+
+const router = useRouter()
+const authStore = useAuthStore()
+const toast = useAppToast()
+
+const form = ref({
+  name: '',
+  email: '',
+  password: '',
+  password_confirmation: '',
+})
+const loading = ref(false)
+const errors = ref<Record<string, string>>({})
+
+async function handleRegister() {
+  errors.value = {}
+  loading.value = true
+
+  try {
+    await authStore.register(form.value)
+    toast.success('Registration successful! Please check your email to verify your account.')
+    router.push('/login')
+  } catch (error: any) {
+    if (error.response?.data?.errors) {
+      errors.value = error.response.data.errors
+    } else {
+      toast.error(error.response?.data?.message || 'Registration failed. Please try again.')
+    }
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+<template>
+  <div class="min-h-screen flex items-center justify-center bg-secondary-50 dark:bg-secondary-950 px-4 py-12">
+    <div class="w-full max-w-md">
+      <div class="text-center mb-8">
+        <RouterLink to="/" class="inline-flex items-center gap-2 text-2xl font-bold text-secondary-900 dark:text-white mb-6">
+          <svg class="h-10 w-10 text-primary-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+          </svg>
+          <span>AuctionHub</span>
+        </RouterLink>
+        <h1 class="text-2xl font-bold text-secondary-900 dark:text-white">Create your account</h1>
+        <p class="mt-2 text-secondary-600 dark:text-secondary-400">Join thousands of buyers and sellers</p>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <form @submit.prevent="handleRegister" class="space-y-6">
+            <div>
+              <label for="name" class="label">Full Name</label>
+              <input
+                id="name"
+                v-model="form.name"
+                type="text"
+                autocomplete="name"
+                class="input"
+                :class="{ 'input-error': errors.name }"
+                placeholder="John Doe"
+                :disabled="loading"
+                required
+              />
+              <p v-if="errors.name" class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ errors.name }}</p>
+            </div>
+
+            <div>
+              <label for="email" class="label">Email Address</label>
+              <input
+                id="email"
+                v-model="form.email"
+                type="email"
+                autocomplete="email"
+                class="input"
+                :class="{ 'input-error': errors.email }"
+                placeholder="you@example.com"
+                :disabled="loading"
+                required
+              />
+              <p v-if="errors.email" class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ errors.email }}</p>
+            </div>
+
+            <div>
+              <label for="password" class="label">Password</label>
+              <input
+                id="password"
+                v-model="form.password"
+                type="password"
+                autocomplete="new-password"
+                class="input"
+                :class="{ 'input-error': errors.password }"
+                placeholder="••••••••"
+                :disabled="loading"
+                required
+                minlength="8"
+              />
+              <p v-if="errors.password" class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ errors.password }}</p>
+              <p class="mt-1.5 text-xs text-secondary-500 dark:text-secondary-400">
+                At least 8 characters with uppercase, lowercase, number, and symbol
+              </p>
+            </div>
+
+            <div>
+              <label for="password_confirmation" class="label">Confirm Password</label>
+              <input
+                id="password_confirmation"
+                v-model="form.password_confirmation"
+                type="password"
+                autocomplete="new-password"
+                class="input"
+                :class="{ 'input-error': errors.password_confirmation }"
+                placeholder="••••••••"
+                :disabled="loading"
+                required
+              />
+              <p v-if="errors.password_confirmation" class="mt-1.5 text-sm text-red-600 dark:text-red-400">{{ errors.password_confirmation }}</p>
+            </div>
+
+            <button type="submit" :disabled="loading" class="btn btn-primary w-full">
+              <span v-if="loading" class="flex items-center justify-center gap-2">
+                <svg class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Creating account...
+              </span>
+              <span v-else>Create account</span>
+            </button>
+          </form>
+
+          <div class="mt-6 text-center">
+            <p class="text-secondary-600 dark:text-secondary-400">
+              Already have an account? <RouterLink to="/login" class="font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400">Sign in</RouterLink>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped></style>
