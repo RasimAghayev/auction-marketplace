@@ -41,9 +41,6 @@ jobs:
       - name: Install dependencies
         working-directory: backend
         run: composer install --no-interaction --prefer-dist
-      - name: Setup testing DB
-        working-directory: backend
-        run: php setup_testing_db.php && php setup_testing_spatie.php
       - name: Run tests
         working-directory: backend
         continue-on-error: true
@@ -65,4 +62,5 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npx vite build
+
 
