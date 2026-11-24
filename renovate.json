@@ -1,0 +1,1 @@
+{"$schema":"https://docs.renovatebot.com/renovate-schema.json","baseBranches":["preview"],"automerge":false,"prCreation":"immediate","schedule":["before 5am on Monday"]}
