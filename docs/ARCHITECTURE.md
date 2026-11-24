@@ -1,41 +1,40 @@
 # Architecture
 
-## Infra layout
+## High-level
+Auction marketplace: Laravel 13 backend (MongoDB), Vue 3 frontend, Nginx reverse proxy, Docker Compose infra.
 
-- `infra/docker/` - Dockerfiles, compose services, and container configs (nginx inside docker/nginx for the reverse proxy container)
-- `infra/nginx/` - Standalone nginx config files used by host/edge (nginx-frontend.conf, frontend-nginx.conf)
-- `infra/scripts/` - run-tests, setup scripts
-- `infra/ci-cd/` - CI/CD definitions
-
-## Nginx difference
-
-`infra/docker/nginx/` configures nginx **inside** the docker container (reverse proxy container).
-`infra/nginx/` holds standalone nginx configs applied on host/edge.
-
-```mermaid
-flowchart TD
-    A[Client] --> B[Edge Nginx infra/nginx]
-    B --> C[Docker Reverse Proxy infra/docker/nginx]
-    C --> D[Backend container]
-    C --> E[Frontend container]
-```
-
-## Branch flow
-
-```mermaid
+`mermaid
 flowchart LR
-    Bots[Dependency Bots] --> Preview[preview]
-    Preview -->|GREEN PRs| Match[Version Match]
-    Match --> Agg[Aggregate Branch]
-    Agg -->|GREEN| Test[test]
-    Test -->|PR| Main[main]
-```
+    Client[Browser] --> Nginx[infra/docker/nginx]
+    Nginx --> FE[frontend]
+    Nginx --> BE[backend Laravel]
+    BE --> Mongo[(MongoDB)]
+    BE --> Redis[(Redis)]
+`
 
-## Layer separation
+## Backend
+- Entry: backend/public/index.php, bootstrap/app.php
+- Routes: backend/routes/api.php (prefix /api/v1)
+- Controllers: backend/app/Http/Controllers/Api/V1/
+- Models: backend/app/Models/ (MongoDB\Laravel)
+- Auth: Sanctum custom PersonalAccessToken (backend/app/Models/PersonalAccessToken.php)
 
-```mermaid
-flowchart TB
-    Infra[infra/] -->|manages| Docker[Docker/CI/Nginx]
-    Backend[backend/] -->|manages| API[API/Services/Models]
-    Frontend[frontend/] -->|manages| UI[Components/Pages/State]
-```
+## Frontend
+- Entry: frontend/src/main.ts
+- Router: frontend/src/router/index.ts
+- Stores: frontend/src/stores/
+- Views: frontend/src/views/
+
+## Infra
+- Compose: infra/compose.yaml
+- Docker: infra/docker/
+- Nginx: infra/docker/nginx (container) + infra/nginx (host/edge)
+- CI: .github/workflows/ci.yml
+
+## Data flow (product create)
+Frontend service -> POST /api/v1/products -> ProductController -> Product model -> products collection.
+
+## Verified paths
+- backend/app/Http/Controllers/Api/V1/ProductController.php
+- backend/app/Models/Product.php
+- frontend/src/views/HomeView.vue
