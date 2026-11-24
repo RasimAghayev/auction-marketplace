@@ -24,6 +24,9 @@ jobs:
         with:
           php-version: '8.4'
           extensions: mongodb, redis
+      - name: Prepare cache dir
+        working-directory: backend
+        run: mkdir -p bootstrap/cache storage/framework/{cache,sessions,views} storage/logs
       - name: Install dependencies
         working-directory: backend
         run: composer install --no-interaction --prefer-dist
