@@ -100,12 +100,12 @@ class Auction extends BaseModel
 
     public function isActive(): bool
     {
-        return $this->status === AuctionStatus::Active->value;
+        return $this->status === AuctionStatus::Active;
     }
 
     public function isScheduled(): bool
     {
-        return $this->status === AuctionStatus::Scheduled->value;
+        return $this->status === AuctionStatus::Scheduled;
     }
 
     public function isFinal(): bool

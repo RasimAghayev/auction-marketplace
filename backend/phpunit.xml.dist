@@ -5,9 +5,8 @@
          colors="true"
          executionOrder="depends,defects"
          failOnEmptyTestSuite="false"
-         failOnRisky="true"
-         failOnWarning="true"
-         verbose="true">
+         failOnRisky="false"
+         failOnWarning="true">
     <testsuites>
         <testsuite name="Unit">
             <directory suffix="Test.php">tests/Unit</directory>

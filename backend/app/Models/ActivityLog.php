@@ -3,10 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Jenssegers\Mongodb\Eloquent\Model as MongoModel;
-use Spatie\Activitylog\Models\Activity as SpatieActivity;
+use MongoDB\Laravel\Eloquent\Model as MongoModel;
 
-class ActivityLog extends SpatieActivity
+class ActivityLog extends MongoModel
 {
     use HasFactory;
 
@@ -28,4 +27,23 @@ class ActivityLog extends SpatieActivity
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    public function getConnectionName(): string
+    {
+        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
+            return 'mongodb_testing';
+        }
+
+        return 'mongodb';
+    }
+
+    public function subject()
+    {
+        return $this->morphTo();
+    }
+
+    public function causer()
+    {
+        return $this->morphTo();
+    }
 }

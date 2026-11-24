@@ -138,8 +138,6 @@ class User extends MongoAuthenticatable implements MustVerifyEmail
 
     public function hasRole($roles, ?string $guard = null): bool
     {
-        \Log::debug('User::hasRole called', ['roles' => $roles, 'guard' => $guard, 'user_id' => $this->getKey()]);
-        
         $roleModel = config('permission.models.role');
         $pivotTable = config('permission.table_names.model_has_roles');
         $morphKey = config('permission.column_names.model_morph_key');
@@ -152,8 +150,6 @@ class User extends MongoAuthenticatable implements MustVerifyEmail
             ->where('model_type', self::class)
             ->pluck('role_id')
             ->toArray();
-
-        \Log::debug('User::hasRole roleIds', ['roleIds' => $roleIds]);
 
         if (empty($roleIds)) {
             return false;

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ProductCondition;
 use App\Enums\ProductStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use MongoDB\BSON\ObjectId;
 use MongoDB\Laravel\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -100,5 +101,18 @@ class Product extends BaseModel
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if (preg_match('/^[0-9a-fA-F]{24}$/', (string) $value)) {
+            $product = static::where('_id', new ObjectId($value))->first();
+
+            if ($product) {
+                return $product;
+            }
+        }
+
+        return static::where('slug', $value)->first();
     }
 }

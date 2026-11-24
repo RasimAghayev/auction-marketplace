@@ -3,7 +3,7 @@
 return [
 
     'defaults' => [
-        'guard' => 'sanctum',
+        'guard' => 'web',
         'passwords' => 'users',
     ],
 
@@ -21,7 +21,7 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'mongodb',
+            'driver' => 'eloquent',
             'model' => App\Models\User::class,
         ],
     ],

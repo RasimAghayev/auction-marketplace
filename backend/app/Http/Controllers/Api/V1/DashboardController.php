@@ -88,7 +88,7 @@ class DashboardController extends Controller
     public function history(Request $request): AnonymousResourceCollection
     {
         $auctions = Auction::where('seller_id', $request->user()->id)
-            ->whereIn('status', [AuctionStatus::Completed->value, AuctionStatus::Cancelled->value, AuctionStatus::Ended->value])
+            ->whereIn('status', [AuctionStatus::Completed->value, AuctionStatus::Cancelled->value, AuctionStatus::Unsold->value])
             ->with('product.category', 'winningBid.user')
             ->latest()
             ->paginate($request->integer('per_page', 12));
