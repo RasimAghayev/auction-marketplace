@@ -1,3 +1,4 @@
+# ![GHCR](https://img.shields.io/badge/ghcr.io-auction--marketplace-blue)
 # Auction Marketplace
 
 A distributed, production-ready online auction marketplace built with Laravel 13, Vue.js 3, MongoDB, and Redis.
@@ -219,12 +220,15 @@ auction-marketplace/
 ## Testing
 
 ```bash
+# ![GHCR](https://img.shields.io/badge/ghcr.io-auction--marketplace-blue)
 # Run all tests
 docker compose exec backend php artisan test
 
+# ![GHCR](https://img.shields.io/badge/ghcr.io-auction--marketplace-blue)
 # Run with coverage
 docker compose exec backend php artisan test --coverage
 
+# ![GHCR](https://img.shields.io/badge/ghcr.io-auction--marketplace-blue)
 # Run specific test
 docker compose exec backend php artisan test --filter=BidTest
 ```
