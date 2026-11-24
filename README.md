@@ -1,4 +1,6 @@
+# [![CI](https://github.com/RasimAghayev/auction-marketplace/actions/workflows/ci.yml/badge.svg)](https://github.com/RasimAghayev/auction-marketplace/actions)
 # ![GHCR](https://img.shields.io/badge/ghcr.io-auction--marketplace-blue)
+# [![CI](https://github.com/RasimAghayev/auction-marketplace/actions/workflows/ci.yml/badge.svg)](https://github.com/RasimAghayev/auction-marketplace/actions)
 # Auction Marketplace
 
 A distributed, production-ready online auction marketplace built with Laravel 13, Vue.js 3, MongoDB, and Redis.
@@ -220,15 +222,21 @@ auction-marketplace/
 ## Testing
 
 ```bash
+# [![CI](https://github.com/RasimAghayev/auction-marketplace/actions/workflows/ci.yml/badge.svg)](https://github.com/RasimAghayev/auction-marketplace/actions)
 # ![GHCR](https://img.shields.io/badge/ghcr.io-auction--marketplace-blue)
+# [![CI](https://github.com/RasimAghayev/auction-marketplace/actions/workflows/ci.yml/badge.svg)](https://github.com/RasimAghayev/auction-marketplace/actions)
 # Run all tests
 docker compose exec backend php artisan test
 
+# [![CI](https://github.com/RasimAghayev/auction-marketplace/actions/workflows/ci.yml/badge.svg)](https://github.com/RasimAghayev/auction-marketplace/actions)
 # ![GHCR](https://img.shields.io/badge/ghcr.io-auction--marketplace-blue)
+# [![CI](https://github.com/RasimAghayev/auction-marketplace/actions/workflows/ci.yml/badge.svg)](https://github.com/RasimAghayev/auction-marketplace/actions)
 # Run with coverage
 docker compose exec backend php artisan test --coverage
 
+# [![CI](https://github.com/RasimAghayev/auction-marketplace/actions/workflows/ci.yml/badge.svg)](https://github.com/RasimAghayev/auction-marketplace/actions)
 # ![GHCR](https://img.shields.io/badge/ghcr.io-auction--marketplace-blue)
+# [![CI](https://github.com/RasimAghayev/auction-marketplace/actions/workflows/ci.yml/badge.svg)](https://github.com/RasimAghayev/auction-marketplace/actions)
 # Run specific test
 docker compose exec backend php artisan test --filter=BidTest
 ```
