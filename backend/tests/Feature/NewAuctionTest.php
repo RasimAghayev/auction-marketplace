@@ -14,6 +14,14 @@ use Illuminate\Foundation\Testing\TestCase as LaravelTestCase;
 uses(LaravelTestCase::class);
 
 beforeEach(function () {
+    foreach ([
+        'products', 'auctions', 'bids', 'notifications', 'categories',
+        'activity_logs', 'auction_participants', 'auction_history',
+        'personal_access_tokens', 'model_has_roles', 'model_has_permissions', 'users',
+    ] as $collection) {
+        \DB::connection('mongodb_testing')->table($collection)->delete();
+    }
+
     $this->seller = User::factory()->create([
         'name' => 'Seller User',
         'email' => 'seller@example.com',
@@ -37,8 +45,6 @@ beforeEach(function () {
 });
 
 test('seller can create auction for own product - new test', function () {
-    die("NEW TEST REACHED");
-    
     $product = Product::factory()->create([
         'seller_id' => $this->seller->id,
         'category_id' => $this->category->id,

@@ -7,13 +7,17 @@ use App\Http\Resources\Api\V1\BidResource;
 use App\Models\Auction;
 use App\Models\Bid;
 use App\Enums\AuctionStatus;
-use App\Enums\BidStatus;
+use App\Modules\Bids\Services\BidService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class BidController extends Controller
 {
+    public function __construct(
+        protected BidService $bids
+    ) {}
+
     public function index(Auction $auction): AnonymousResourceCollection
     {
         $bids = $auction->bids()
@@ -26,7 +30,7 @@ class BidController extends Controller
 
     public function store(Request $request, Auction $auction): JsonResponse
     {
-        if ($auction->status !== AuctionStatus::Active->value) {
+        if ($auction->status !== AuctionStatus::Active) {
             return response()->json([
                 'message' => 'Auction is not active.',
             ], 422);
@@ -55,19 +59,7 @@ class BidController extends Controller
             ], 422);
         }
 
-        $bid = Bid::create([
-            'auction_id' => $auction->id,
-            'user_id' => $request->user()->id,
-            'amount' => $data['amount'],
-            'status' => BidStatus::Pending->value,
-        ]);
-
-        $auction->update([
-            'current_price' => $data['amount'],
-            'bid_count' => $auction->bid_count + 1,
-        ]);
-
-        $bid->update(['status' => BidStatus::Accepted->value]);
+        $bid = $this->bids->place($auction, $request->user(), (float) $data['amount']);
 
         return response()->json([
             'message' => 'Bid placed successfully.',

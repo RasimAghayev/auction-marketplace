@@ -51,7 +51,7 @@ class Bid extends BaseModel
 
     public function isWinning(): bool
     {
-        return $this->status === BidStatus::Winning->value;
+        return $this->status === BidStatus::Winning;
     }
 
     public function isActive(): bool

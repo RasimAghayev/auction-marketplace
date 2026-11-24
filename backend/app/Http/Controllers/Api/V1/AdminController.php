@@ -18,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Response;
 
 class AdminController extends Controller
 {
@@ -184,6 +185,7 @@ class AdminController extends Controller
 
         $data = $request->validate([
             'name' => 'required|string|max:255',
+            'slug' => 'required|string|max:255',
             'description' => 'nullable|string',
             'icon' => 'nullable|string|max:255',
         ]);
@@ -249,7 +251,7 @@ class AdminController extends Controller
         ]);
     }
 
-    public function deleteCategory(Category $category): JsonResponse
+    public function deleteCategory(Category $category): Response
     {
         if ($category->children()->exists()) {
             return response()->json([
@@ -259,7 +261,7 @@ class AdminController extends Controller
 
         $category->delete();
 
-        return response()->json(['message' => 'Category deleted successfully.']);
+        return response()->noContent();
     }
 
     public function reports(): JsonResponse

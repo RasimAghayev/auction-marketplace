@@ -16,19 +16,16 @@ class AuctionPolicy
     public function update(User $user, Auction $auction): bool
     {
         return $user->id === $auction->seller_id
-            && $auction->status === \App\Enums\AuctionStatus::Scheduled->value;
+            && $auction->status === \App\Enums\AuctionStatus::Scheduled;
     }
 
     public function start(User $user, Auction $auction): bool
     {
-        return $user->id === $auction->seller_id
-            && $auction->status === \App\Enums\AuctionStatus::Scheduled->value
-            && $auction->start_date <= now();
+        return $user->id === $auction->seller_id;
     }
 
     public function cancel(User $user, Auction $auction): bool
     {
-        return $user->id === $auction->seller_id
-            && $auction->status !== \App\Enums\AuctionStatus::Active->value;
+        return $user->id === $auction->seller_id;
     }
 }

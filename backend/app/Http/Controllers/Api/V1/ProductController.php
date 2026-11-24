@@ -6,13 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\ProductResource;
 use App\Models\Product;
 use App\Enums\ProductStatus;
+use App\Modules\Products\Services\ProductService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Response;
 
 class ProductController extends Controller
 {
+    public function __construct(
+        protected ProductService $products
+    ) {}
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $query = Product::with(['category', 'seller'])
@@ -56,6 +62,8 @@ class ProductController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Product::class);
+
         $connection = config('database.default');
         if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
             $connection = 'mongodb_testing';
@@ -79,13 +87,14 @@ class ProductController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'starting_price' => 'required|numeric|min:0',
-            'condition' => 'required|in:new,used,refurbished',
+            'condition' => 'required|in:new,used',
         ]);
 
-        $product = Product::create([
+        $product = $this->products->create([
             ...$data,
+            'category_id' => $categoryId,
             'seller_id' => $request->user()->id,
-            'status' => ProductStatus::Published->value,
+            'status' => ProductStatus::Published,
         ]);
 
         return response()->json([
@@ -123,11 +132,11 @@ class ProductController extends Controller
             'title' => 'sometimes|string|max:255',
             'description' => 'sometimes|string',
             'starting_price' => 'sometimes|numeric|min:0',
-            'condition' => 'sometimes|in:new,used,refurbished',
+            'condition' => 'sometimes|in:new,used',
             'status' => 'sometimes|in:draft,published,in_auction,sold',
         ]);
 
-        $product->update($data);
+        $product = $this->products->update($product, $data);
 
         return response()->json([
             'message' => 'Product updated successfully.',
@@ -135,12 +144,17 @@ class ProductController extends Controller
         ]);
     }
 
-    public function destroy(Product $product): JsonResponse
+    public function destroy(Product $product): Response
     {
         $this->authorize('delete', $product);
-        $product->delete();
 
-        return response()->json(['message' => 'Product deleted successfully.']);
+        try {
+            $this->products->delete($product);
+        } catch (\DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->noContent();
     }
 
     public function uploadImages(Request $request, Product $product): JsonResponse

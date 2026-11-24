@@ -24,7 +24,7 @@ class ActivityLogFactory extends Factory
             'causer_type' => User::class,
             'causer_id' => User::factory(),
             'properties' => [],
-            'batch_uuid' => Str::uuid(),
+            'batch_uuid' => (string) Str::uuid(),
         ];
     }
 }
