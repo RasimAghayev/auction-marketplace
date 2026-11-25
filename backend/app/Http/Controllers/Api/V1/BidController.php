@@ -6,8 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\BidResource;
 use App\Models\Auction;
 use App\Models\Bid;
-use App\Enums\AuctionStatus;
-use App\Enums\BidStatus;
 use App\Modules\Bids\Services\BidService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,36 +29,17 @@ class BidController extends Controller
 
     public function store(Request $request, Auction $auction): JsonResponse
     {
-        if ($auction->status !== AuctionStatus::Active) {
-            return response()->json([
-                'message' => 'Auction is not active.',
-            ], 422);
-        }
-
-        if ($auction->seller_id === $request->user()->id) {
-            return response()->json([
-                'message' => 'You cannot bid on your own auction.',
-            ], 403);
-        }
-
-        if ($auction->end_date <= now()) {
-            return response()->json([
-                'message' => 'Auction has ended.',
-            ], 422);
-        }
-
         $data = $request->validate([
             'amount' => 'required|numeric|min:0.01',
         ]);
 
-        $minimumBid = $auction->current_price + $auction->min_bid_increment;
-        if ($data['amount'] < $minimumBid) {
+        try {
+            $bid = $this->bids->place($auction, $request->user(), $data['amount']);
+        } catch (\DomainException $e) {
             return response()->json([
-                'message' => "Bid must be at least {$minimumBid}.",
+                'message' => $e->getMessage(),
             ], 422);
         }
-
-        $bid = $this->bids->place($auction, $request->user(), $data['amount']);
 
         return response()->json([
             'message' => 'Bid placed successfully.',

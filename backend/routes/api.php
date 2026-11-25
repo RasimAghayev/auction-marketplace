@@ -12,10 +12,10 @@ use App\Http\Controllers\Api\V1\AdminController;
 
 Route::prefix('v1')->group(function () {
     // Public routes
-    Route::post('/auth/register', [AuthController::class, 'register']);
-    Route::post('/auth/login', [AuthController::class, 'login']);
-    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
-    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+    Route::post('/auth/register', [AuthController::class, 'register'])->middleware('rate.limit:5,1');
+    Route::post('/auth/login', [AuthController::class, 'login'])->middleware('rate.limit:10,1');
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('rate.limit:3,1');
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('rate.limit:3,1');
     Route::get('/auth/verify-email/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
     Route::post('/auth/verification-notification', [AuthController::class, 'sendVerificationEmail'])->middleware('auth:sanctum');
 
@@ -63,7 +63,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/auctions/{auction}/cancel', [AuctionController::class, 'cancel']);
 
         // Bids
-        Route::post('/auctions/{auction}/bids', [BidController::class, 'store']);
+        Route::post('/auctions/{auction}/bids', [BidController::class, 'store'])->middleware('rate.limit:30,1');
         Route::get('/my-bids', [BidController::class, 'myBids']);
 
         // Notifications
