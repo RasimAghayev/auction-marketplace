@@ -21,7 +21,8 @@ class BidService
     {
         $lockKey = 'lock:auction:' . $auction->id . ':bid';
 
-        return Cache::lock($lockKey, 10)->get(function () use ($auction, $user, $amount) {
+        return Cache::lock($lockKey, 10)->get(
+            function () use ($auction, $user, $amount) {
             $auction->refresh();
 
             if ($auction->status !== AuctionStatus::Active) {
@@ -79,6 +80,6 @@ class BidService
             }
 
             return $bid;
-        });
+        }, 5);
     }
 }
