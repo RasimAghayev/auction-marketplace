@@ -13,7 +13,9 @@ class RolePermissionSeeder extends Seeder
 {
     public function run(): void
     {
-        $connection = app()->environment('testing') ? 'mongodb_testing' : 'mongodb';
+        $connection = app()->environment('testing') && config('database.connections.mongodb_testing')
+            ? 'mongodb_testing'
+            : 'mongodb';
 
         DB::connection($connection)->table('roles')->delete();
         DB::connection($connection)->table('permissions')->delete();
@@ -66,8 +68,8 @@ class RolePermissionSeeder extends Seeder
 
         $createdPermissions = [];
 
-        foreach ($permissions as $label => [$name, $slug]) {
-            $createdPermissions[$slug] = Permission::create([
+        foreach ($permissions as $label => [$name]) {
+            $createdPermissions[$name] = Permission::create([
                 'name' => $name,
                 'guard_name' => 'sanctum',
             ]);

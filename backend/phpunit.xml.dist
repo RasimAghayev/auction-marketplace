@@ -28,7 +28,7 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_DRIVER" value="array"/>
         <env name="DB_CONNECTION" value="mongodb_testing"/>
-        <env name="MONGODB_URI_TESTING" value="mongodb://admin:f841mu3Nmi1cUZme755cX%2FTCWyB13ZeHoohRUe3WqmQ%3D@mongodb:27017/?authSource=admin"/>
+        <env name="MONGODB_URI_TESTING" value="mongodb://admin:4Y4fEgzujaOswRlFJcKF0nC2VpZ0ZZUB@mongodb:27017/?authSource=admin"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

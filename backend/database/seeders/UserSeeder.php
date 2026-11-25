@@ -3,11 +3,8 @@
 namespace Database\Seeders;
 
 use App\Enums\UserRole;
-use App\Models\Permission;
-use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class UserSeeder extends Seeder
 {
@@ -96,16 +93,5 @@ class UserSeeder extends Seeder
         $this->command?->info('Created admin: ' . $admin->email);
         $this->command?->info('Created sellers: ' . $seller1->email . ', ' . $seller2->email);
         $this->command?->info('Created buyers: ' . $buyer1->email . ', ' . $buyer2->email . ', ' . $buyer3->email);
-
-        $adminRole = Role::firstOrCreate(['name' => UserRole::Admin->value, 'guard_name' => 'sanctum']);
-        $sellerRole = Role::firstOrCreate(['name' => UserRole::Seller->value, 'guard_name' => 'sanctum']);
-        $userRole = Role::firstOrCreate(['name' => UserRole::User->value, 'guard_name' => 'sanctum']);
-
-        $admin->assignRole($adminRole);
-        $seller1->assignRole($sellerRole);
-        $seller2->assignRole($sellerRole);
-        $buyer1->assignRole($userRole);
-        $buyer2->assignRole($userRole);
-        $buyer3->assignRole($userRole);
     }
 }

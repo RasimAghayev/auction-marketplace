@@ -5,10 +5,10 @@ use Illuminate\Foundation\Testing\TestCase as LaravelTestCase;
 // Set testing environment variables BEFORE bootstrapping Laravel
 $_ENV['APP_ENV'] = 'testing';
 $_ENV['DB_CONNECTION'] = 'mongodb_testing';
-$_ENV['MONGODB_URI_TESTING'] = 'mongodb://admin:f841mu3Nmi1cUZme755cX%2FTCWyB13ZeHoohRUe3WqmQ%3D@mongodb:27017/?authSource=admin';
+$_ENV['MONGODB_URI_TESTING'] = 'mongodb://admin:4Y4fEgzujaOswRlFJcKF0nC2VpZ0ZZUB@mongodb:27017/?authSource=admin';
 $_ENV['MONGODB_DATABASE_TESTING'] = 'auction_marketplace_testing';
 $_ENV['MONGODB_USERNAME_TESTING'] = 'admin';
-$_ENV['MONGODB_PASSWORD_TESTING'] = 'f841mu3Nmi1cUZme755cX/TCWyB13ZeHoohRUe3WqmQ=';
+$_ENV['MONGODB_PASSWORD_TESTING'] = '4Y4fEgzujaOswRlFJcKF0nC2VpZ0ZZUB';
 $_ENV['MONGODB_AUTH_SOURCE_TESTING'] = 'admin';
 $_ENV['MONGODB_REPLICA_SET_TESTING'] = '';
 $_ENV['CACHE_DRIVER'] = 'array';
@@ -20,7 +20,7 @@ $_ENV['TELESCOPE_ENABLED'] = 'false';
 
 putenv('APP_ENV=testing');
 putenv('DB_CONNECTION=mongodb_testing');
-putenv('MONGODB_URI_TESTING=mongodb://admin:f841mu3Nmi1cUZme755cX%2FTCWyB13ZeHoohRUe3WqmQ%3D@mongodb:27017/?authSource=admin');
+putenv('MONGODB_URI_TESTING=mongodb://admin:4Y4fEgzujaOswRlFJcKF0nC2VpZ0ZZUB@mongodb:27017/?authSource=admin');
 putenv('MONGODB_REPLICA_SET_TESTING=');
 putenv('CACHE_DRIVER=array');
 putenv('MAIL_MAILER=array');

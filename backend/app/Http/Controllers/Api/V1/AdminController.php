@@ -12,7 +12,6 @@ use App\Models\Product;
 use App\Models\Auction;
 use App\Models\Category;
 use App\Enums\ProductStatus;
-use App\Enums\AuctionStatus;
 use App\Modules\Users\Services\UserService;
 use App\Modules\Products\Repositories\ProductRepository;
 use App\Modules\Auctions\Services\AuctionService;
