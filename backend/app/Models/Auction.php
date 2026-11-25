@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\AuctionStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use MongoDB\BSON\ObjectId;
 use MongoDB\Laravel\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
@@ -98,14 +99,32 @@ class Auction extends BaseModel
         return $this->hasMany(AuctionHistory::class, 'auction_id')->orderBy('created_at', 'desc');
     }
 
+    public function getRouteKeyName(): string
+    {
+        return '_id';
+    }
+
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if (is_string($value) && preg_match('/^[0-9a-fA-F]{24}$/', $value)) {
+            $auction = static::where('_id', new ObjectId($value))->first();
+
+            if ($auction) {
+                return $auction;
+            }
+        }
+
+        return parent::resolveRouteBinding($value, $field);
+    }
+
     public function isActive(): bool
     {
-        return $this->status === AuctionStatus::Active->value;
+        return $this->status === AuctionStatus::Active;
     }
 
     public function isScheduled(): bool
     {
-        return $this->status === AuctionStatus::Scheduled->value;
+        return $this->status === AuctionStatus::Scheduled;
     }
 
     public function isFinal(): bool

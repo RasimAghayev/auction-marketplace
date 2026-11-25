@@ -9,6 +9,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\HasApiTokens;
+use MongoDB\BSON\ObjectId;
 use MongoDB\Laravel\Auth\User as MongoAuthenticatable;
 use MongoDB\Laravel\Eloquent\SoftDeletes;
 use Spatie\Permission\Traits\HasRoles;
@@ -75,6 +76,24 @@ class User extends MongoAuthenticatable implements MustVerifyEmail
             ->logOnly(['name', 'email', 'role', 'is_active'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return '_id';
+    }
+
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if (is_string($value) && preg_match('/^[0-9a-fA-F]{24}$/', $value)) {
+            $user = static::where('_id', new ObjectId($value))->first();
+
+            if ($user) {
+                return $user;
+            }
+        }
+
+        return parent::resolveRouteBinding($value, $field);
     }
 
     public function products()

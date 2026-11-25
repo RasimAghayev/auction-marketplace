@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\ProductResource;
 use App\Models\Product;
 use App\Enums\ProductStatus;
+use App\Modules\Products\Services\ProductService;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -13,6 +15,10 @@ use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
+    public function __construct(
+        protected ProductService $products
+    ) {}
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $query = Product::with(['category', 'seller'])
@@ -61,10 +67,9 @@ class ProductController extends Controller
             $connection = 'mongodb_testing';
         }
 
-        // Manual validation for category_id to use correct connection
         $categoryId = $request->input('category_id');
         $categoryExists = DB::connection($connection)->table('categories')->where('_id', $categoryId)->exists();
-        
+
         if (!$categoryExists) {
             return response()->json([
                 'message' => 'The given data was invalid.',
@@ -82,7 +87,7 @@ class ProductController extends Controller
             'condition' => 'required|in:new,used,refurbished',
         ]);
 
-        $product = Product::create([
+        $product = $this->products->create([
             ...$data,
             'seller_id' => $request->user()->id,
             'status' => ProductStatus::Published->value,
@@ -103,11 +108,10 @@ class ProductController extends Controller
             $connection = 'mongodb_testing';
         }
 
-        // Manual validation for category_id to use correct connection
         $categoryId = $request->input('category_id');
         if ($categoryId) {
             $categoryExists = DB::connection($connection)->table('categories')->where('_id', $categoryId)->exists();
-            
+
             if (!$categoryExists) {
                 return response()->json([
                     'message' => 'The given data was invalid.',
@@ -127,7 +131,7 @@ class ProductController extends Controller
             'status' => 'sometimes|in:draft,published,in_auction,sold',
         ]);
 
-        $product->update($data);
+        $product = $this->products->update($product, $data);
 
         return response()->json([
             'message' => 'Product updated successfully.',
@@ -138,7 +142,12 @@ class ProductController extends Controller
     public function destroy(Product $product): JsonResponse
     {
         $this->authorize('delete', $product);
-        $product->delete();
+
+        try {
+            $this->products->delete($product);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json(['message' => 'Product deleted successfully.']);
     }

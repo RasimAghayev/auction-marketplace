@@ -101,4 +101,17 @@ class Product extends BaseModel
     {
         return 'slug';
     }
+
+    public function resolveRouteBinding($value, $field = null)
+    {
+        if (is_string($value) && preg_match('/^[0-9a-fA-F]{24}$/', $value)) {
+            $product = static::where('_id', new ObjectId($value))->first();
+
+            if ($product) {
+                return $product;
+            }
+        }
+
+        return parent::resolveRouteBinding($value, $field);
+    }
 }

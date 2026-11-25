@@ -8,7 +8,9 @@ use App\Models\Auction;
 use App\Models\Product;
 use App\Enums\AuctionStatus;
 use App\Enums\ProductStatus;
+use App\Modules\Auctions\Services\AuctionService;
 use Carbon\Carbon;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -16,6 +18,10 @@ use Illuminate\Support\Facades\DB;
 
 class AuctionController extends Controller
 {
+    public function __construct(
+        protected AuctionService $auctions
+    ) {}
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $query = Auction::with(['product.category', 'seller'])
@@ -42,10 +48,9 @@ class AuctionController extends Controller
             $connection = 'mongodb_testing';
         }
 
-        // Manual validation for product_id to use correct connection
         $productId = $request->input('product_id');
         $productExists = DB::connection($connection)->table('products')->where('_id', $productId)->exists();
-        
+
         if (!$productExists) {
             return response()->json([
                 'message' => 'The given data was invalid.',
@@ -68,15 +73,11 @@ class AuctionController extends Controller
         $product = Product::findOrFail($data['product_id']);
         $this->authorize('createAuction', $product);
 
-        $auction = Auction::create([
+        $auction = $this->auctions->create([
             ...$data,
             'product_id' => $product->id,
             'seller_id' => $request->user()->id,
-            'current_price' => $data['starting_price'],
-            'status' => AuctionStatus::Scheduled->value,
         ]);
-
-        $product->update(['status' => ProductStatus::InAuction->value]);
 
         return response()->json([
             'message' => 'Auction created successfully.',
@@ -96,7 +97,7 @@ class AuctionController extends Controller
             'end_date' => 'sometimes|date|after:start_date',
         ]);
 
-        $auction->update($data);
+        $auction = $this->auctions->update($auction, $data);
 
         return response()->json([
             'message' => 'Auction updated successfully.',
@@ -108,16 +109,11 @@ class AuctionController extends Controller
     {
         $this->authorize('start', $auction);
 
-        if ($auction->status !== AuctionStatus::Scheduled->value) {
-            return response()->json([
-                'message' => 'Auction can only be started from scheduled status.',
-            ], 422);
+        try {
+            $auction = $this->auctions->start($auction);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-
-        $auction->update([
-            'status' => AuctionStatus::Active->value,
-            'started_at' => now(),
-        ]);
 
         return response()->json([
             'message' => 'Auction started successfully.',
@@ -129,15 +125,11 @@ class AuctionController extends Controller
     {
         $this->authorize('cancel', $auction);
 
-        if ($auction->status === AuctionStatus::Active) {
-            return response()->json([
-                'message' => 'Cannot cancel an active auction.',
-            ], 422);
+        try {
+            $auction = $this->auctions->cancel($auction);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
         }
-
-        $auction->update(['status' => AuctionStatus::Cancelled->value]);
-
-        $auction->product->update(['status' => ProductStatus::Published->value]);
 
         return response()->json([
             'message' => 'Auction cancelled successfully.',
