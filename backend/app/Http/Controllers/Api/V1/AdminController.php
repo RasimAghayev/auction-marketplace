@@ -11,9 +11,9 @@ use App\Models\User;
 use App\Models\Product;
 use App\Models\Auction;
 use App\Models\Category;
-use App\Enums\UserRole;
 use App\Enums\ProductStatus;
 use App\Enums\AuctionStatus;
+use App\Modules\Users\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -21,6 +21,10 @@ use Illuminate\Support\Facades\DB;
 
 class AdminController extends Controller
 {
+    public function __construct(
+        protected UserService $userService
+    ) {}
+
     public function dashboard(): JsonResponse
     {
         return response()->json([
@@ -40,25 +44,24 @@ class AdminController extends Controller
 
     public function users(Request $request): AnonymousResourceCollection
     {
-        $users = User::with('roles')
-            ->when($request->search, fn($q) => $q->where('name', 'like', "%{$request->search}%")
-                ->orWhere('email', 'like', "%{$request->search}%"))
-            ->when($request->role, fn($q) => $q->whereHas('roles', fn($r) => $r->where('name', $request->role)))
-            ->latest()
-            ->paginate($request->integer('per_page', 20));
+        $users = $this->userService->list([
+            'search' => $request->search,
+            'role' => $request->role,
+            'per_page' => $request->integer('per_page', 20),
+        ]);
 
         return UserResource::collection($users);
     }
 
     public function suspendUser(User $user): JsonResponse
     {
-        if ($user->hasRole(UserRole::Admin->value)) {
+        try {
+            $user = $this->userService->suspend($user);
+        } catch (\DomainException $e) {
             return response()->json([
-                'message' => 'Cannot suspend an admin user.',
+                'message' => $e->getMessage(),
             ], 403);
         }
-
-        $user->update(['is_active' => false]);
 
         return response()->json([
             'message' => 'User suspended successfully.',
@@ -68,7 +71,7 @@ class AdminController extends Controller
 
     public function unsuspendUser(User $user): JsonResponse
     {
-        $user->update(['is_active' => true]);
+        $user = $this->userService->unsuspend($user);
 
         return response()->json([
             'message' => 'User unsuspended successfully.',

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\UserResource;
 use App\Models\User;
+use App\Modules\Users\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,9 +13,13 @@ use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
+    public function __construct(
+        protected UserService $userService
+    ) {}
+
     public function show(User $user): UserResource
     {
-        return new UserResource($user->load('roles', 'permissions'));
+        return new UserResource($this->userService->show((string) $user->id));
     }
 
     public function update(Request $request, User $user): JsonResponse
@@ -31,7 +36,7 @@ class UserController extends Controller
             $data['avatar'] = $request->file('avatar')->store('avatars', 'public');
         }
 
-        $user->update($data);
+        $user = $this->userService->update($user, $data);
 
         return response()->json([
             'message' => 'Profile updated successfully.',
@@ -52,8 +57,7 @@ class UserController extends Controller
             'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
-        $user->update(['password' => \Hash::make($request->password)]);
-        $user->tokens()->delete();
+        $this->userService->updatePassword($user, $request->current_password, $request->password);
 
         return response()->json(['message' => 'Password updated successfully.']);
     }
