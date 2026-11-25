@@ -37,4 +37,9 @@ class NotificationRepository
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
     }
+
+    public function create(array $attributes): Notification
+    {
+        return Notification::create($attributes);
+    }
 }

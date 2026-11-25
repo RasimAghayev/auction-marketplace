@@ -31,4 +31,20 @@ class NotificationService
     {
         return $this->repository->markAllAsRead($userId);
     }
+
+    public function createForUser(
+        string $userId,
+        string $type,
+        string $title,
+        string $message,
+        array $data = []
+    ): Notification {
+        return $this->repository->create([
+            'user_id' => $userId,
+            'type' => $type,
+            'title' => $title,
+            'message' => $message,
+            'data' => $data,
+        ]);
+    }
 }

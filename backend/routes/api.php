@@ -57,10 +57,11 @@ Route::prefix('v1')->group(function () {
         Route::delete('/products/{product}/images/{image}', [ProductController::class, 'deleteImage']);
 
         // Auctions
-        Route::post('/auctions', [AuctionController::class, 'store']);
-        Route::put('/auctions/{auction}', [AuctionController::class, 'update']);
-        Route::post('/auctions/{auction}/start', [AuctionController::class, 'start']);
-        Route::post('/auctions/{auction}/cancel', [AuctionController::class, 'cancel']);
+        Route::post('/auctions', [AuctionController::class, 'store'])->middleware('rate.limit:10,1');
+        Route::put('/auctions/{auction}', [AuctionController::class, 'update'])->middleware('rate.limit:10,1');
+        Route::post('/auctions/{auction}/start', [AuctionController::class, 'start'])->middleware('rate.limit:10,1');
+        Route::post('/auctions/{auction}/cancel', [AuctionController::class, 'cancel'])->middleware('rate.limit:10,1');
+        Route::post('/auctions/{auction}/complete', [AuctionController::class, 'complete'])->middleware('rate.limit:10,1');
 
         // Bids
         Route::post('/auctions/{auction}/bids', [BidController::class, 'store'])->middleware('rate.limit:30,1');

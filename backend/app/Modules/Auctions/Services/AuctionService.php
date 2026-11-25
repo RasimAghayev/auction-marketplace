@@ -8,6 +8,7 @@ use App\Enums\ProductStatus;
 use App\Models\Auction;
 use App\Models\Bid;
 use App\Models\Product;
+use App\Modules\Notifications\Services\NotificationService;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Support\Facades\Cache;
@@ -16,6 +17,10 @@ class AuctionService
 {
     public const ACTIVE_AUCTIONS_CACHE_KEY = 'auctions:active';
     public const ACTIVE_AUCTIONS_CACHE_TTL = 300;
+
+    public function __construct(
+        protected NotificationService $notificationService
+    ) {}
 
     public function create(array $attributes): Auction
     {
@@ -63,6 +68,14 @@ class AuctionService
             'started_at' => now(),
         ]);
 
+        $this->notificationService->createForUser(
+            $auction->seller_id,
+            'auction_started',
+            'Auction started',
+            "Your auction '{$auction->product->title}' is now live.",
+            ['auction_id' => (string) $auction->id]
+        );
+
         Cache::forget(self::ACTIVE_AUCTIONS_CACHE_KEY);
 
         return $auction;
@@ -77,6 +90,14 @@ class AuctionService
         $auction->update(['status' => AuctionStatus::Cancelled]);
 
         $auction->product?->update(['status' => ProductStatus::Published]);
+
+        $this->notificationService->createForUser(
+            $auction->seller_id,
+            'auction_cancelled',
+            'Auction cancelled',
+            "Your auction '{$auction->product->title}' has been cancelled.",
+            ['auction_id' => (string) $auction->id]
+        );
 
         Cache::forget(self::ACTIVE_AUCTIONS_CACHE_KEY);
 
@@ -109,6 +130,24 @@ class AuctionService
             } else {
                 $auction->product?->update(['status' => ProductStatus::Sold]);
             }
+
+            // Notify winner
+            $this->notificationService->createForUser(
+                $winningBid->user_id,
+                'auction_won',
+                'You won the auction!',
+                "Congratulations! You won '{$auction->product->title}' with a bid of {$winningBid->amount}.",
+                ['auction_id' => (string) $auction->id, 'bid_id' => (string) $winningBid->id, 'amount' => $winningBid->amount]
+            );
+
+            // Notify seller
+            $this->notificationService->createForUser(
+                $auction->seller_id,
+                'auction_completed',
+                'Auction completed',
+                "Your auction '{$auction->product->title}' has been completed. Winner: {$winningBid->user->name ?? 'Unknown'}",
+                ['auction_id' => (string) $auction->id, 'winning_bid_id' => (string) $winningBid->id, 'amount' => $winningBid->amount]
+            );
         } else {
             $auction->update([
                 'status' => AuctionStatus::Completed,
@@ -116,6 +155,14 @@ class AuctionService
             ]);
 
             $auction->product?->update(['status' => ProductStatus::Published]);
+
+            $this->notificationService->createForUser(
+                $auction->seller_id,
+                'auction_unsold',
+                'Auction ended unsold',
+                "Your auction '{$auction->product->title}' ended without any bids.",
+                ['auction_id' => (string) $auction->id]
+            );
         }
 
         Cache::forget(self::ACTIVE_AUCTIONS_CACHE_KEY);

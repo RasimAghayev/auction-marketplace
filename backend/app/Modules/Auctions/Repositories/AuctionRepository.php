@@ -4,8 +4,10 @@ namespace App\Modules\Auctions\Repositories;
 
 use App\Enums\AuctionStatus;
 use App\Models\Auction;
+use App\Models\Product;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class AuctionRepository
 {
@@ -45,6 +47,16 @@ class AuctionRepository
     public function create(array $attributes): Auction
     {
         return Auction::create($attributes);
+    }
+
+    public function productExists(string $productId): bool
+    {
+        $connection = config('database.default');
+        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
+            $connection = 'mongodb_testing';
+        }
+
+        return DB::connection($connection)->table('products')->where('_id', $productId)->exists();
     }
 
     public function update(Auction $auction, array $attributes): Auction

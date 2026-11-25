@@ -2,17 +2,23 @@
 
 namespace App\Modules\Bids\Services;
 
+use App\Enums\AuctionStatus;
 use App\Enums\BidStatus;
 use App\Models\Auction;
 use App\Models\Bid;
 use App\Models\User;
+use App\Modules\Notifications\Services\NotificationService;
 use DomainException;
 
 class BidService
 {
+    public function __construct(
+        protected NotificationService $notificationService
+    ) {}
+
     public function place(Auction $auction, User $user, float $amount): Bid
     {
-        if ($auction->status !== \App\Enums\AuctionStatus::Active) {
+        if ($auction->status !== AuctionStatus::Active) {
             throw new DomainException('Auction is not active.');
         }
 
@@ -29,6 +35,8 @@ class BidService
             throw new DomainException("Bid must be at least {$minimumBid}.");
         }
 
+        $previousBid = $auction->bids()->where('status', BidStatus::Accepted)->orderByDesc('amount')->first();
+
         $bid = Bid::create([
             'auction_id' => $auction->id,
             'user_id' => $user->id,
@@ -42,6 +50,26 @@ class BidService
         ]);
 
         $bid->update(['status' => BidStatus::Accepted]);
+
+        // Notify auction seller of new bid
+        $this->notificationService->createForUser(
+            $auction->seller_id,
+            'new_bid',
+            'New bid placed',
+            "Someone placed a bid of {$amount} on your auction '{$auction->product->title}'.",
+            ['auction_id' => (string) $auction->id, 'bid_id' => (string) $bid->id, 'amount' => $amount]
+        );
+
+        // Notify previous bidder they were outbid
+        if ($previousBid && $previousBid->user_id !== $user->id) {
+            $this->notificationService->createForUser(
+                $previousBid->user_id,
+                'outbid',
+                'You have been outbid',
+                "Your bid on '{$auction->product->title}' has been outbid by {$amount}.",
+                ['auction_id' => (string) $auction->id, 'bid_id' => (string) $bid->id, 'amount' => $amount]
+            );
+        }
 
         return $bid;
     }

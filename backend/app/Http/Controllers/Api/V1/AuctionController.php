@@ -5,33 +5,28 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\AuctionResource;
 use App\Models\Auction;
-use App\Models\Product;
 use App\Enums\AuctionStatus;
-use App\Enums\ProductStatus;
+use App\Modules\Auctions\Repositories\AuctionRepository;
 use App\Modules\Auctions\Services\AuctionService;
 use Carbon\Carbon;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\DB;
 
 class AuctionController extends Controller
 {
     public function __construct(
-        protected AuctionService $auctions
+        protected AuctionService $auctions,
+        protected AuctionRepository $auctionRepository
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Auction::with(['product.category', 'seller'])
-            ->where('status', AuctionStatus::Active->value);
-
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        $auctions = $query->latest()->paginate($request->integer('per_page', 12));
+        $auctions = $this->auctionRepository->paginate([
+            'status' => $request->status,
+            'per_page' => $request->integer('per_page', 12),
+        ]);
 
         return AuctionResource::collection($auctions);
     }
@@ -43,21 +38,15 @@ class AuctionController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $connection = config('database.default');
-        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
-            $connection = 'mongodb_testing';
-        }
-
         $productId = $request->input('product_id');
-        $productExists = DB::connection($connection)->table('products')->where('_id', $productId)->exists();
 
-        if (!$productExists) {
+        if (! $this->auctionRepository->productExists($productId)) {
             return response()->json([
                 'message' => 'The given data was invalid.',
                 'errors' => [
-                    'product_id' => ['The selected product id is invalid.']
+                    'product_id' => ['The selected product id is invalid.'],
                 ],
-                'error' => 'validation_error'
+                'error' => 'validation_error',
             ], 422);
         }
 
@@ -70,12 +59,9 @@ class AuctionController extends Controller
             'end_date' => 'required|date|after:start_date',
         ]);
 
-        $product = Product::findOrFail($data['product_id']);
-        $this->authorize('createAuction', $product);
-
         $auction = $this->auctions->create([
             ...$data,
-            'product_id' => $product->id,
+            'product_id' => $productId,
             'seller_id' => $request->user()->id,
         ]);
 
@@ -134,6 +120,22 @@ class AuctionController extends Controller
         return response()->json([
             'message' => 'Auction cancelled successfully.',
             'auction' => new AuctionResource($auction),
+        ]);
+    }
+
+    public function complete(Auction $auction): JsonResponse
+    {
+        $this->authorize('complete', $auction);
+
+        try {
+            $auction = $this->auctions->complete($auction);
+        } catch (DomainException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message' => 'Auction completed successfully.',
+            'auction' => new AuctionResource($auction->load(['winningBid.user'])),
         ]);
     }
 }
