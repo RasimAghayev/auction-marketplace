@@ -5,6 +5,7 @@ namespace App\Modules\Products\Repositories;
 use App\Enums\ProductStatus;
 use App\Models\Product;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class ProductRepository
 {
@@ -65,5 +66,15 @@ class ProductRepository
     public function countByStatus(string $status): int
     {
         return Product::where('status', $status)->count();
+    }
+
+    public function categoryExists(string $categoryId): bool
+    {
+        $connection = config('database.default');
+        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
+            $connection = 'mongodb_testing';
+        }
+
+        return DB::connection($connection)->table('categories')->where('_id', $categoryId)->exists();
     }
 }

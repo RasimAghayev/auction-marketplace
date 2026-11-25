@@ -13,7 +13,6 @@ use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
@@ -53,21 +52,15 @@ class ProductController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $connection = config('database.default');
-        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
-            $connection = 'mongodb_testing';
-        }
-
         $categoryId = $request->input('category_id');
-        $categoryExists = DB::connection($connection)->table('categories')->where('_id', $categoryId)->exists();
 
-        if (!$categoryExists) {
+        if (! $this->productRepository->categoryExists($categoryId)) {
             return response()->json([
                 'message' => 'The given data was invalid.',
                 'errors' => [
-                    'category_id' => ['The selected category id is invalid.']
+                    'category_id' => ['The selected category id is invalid.'],
                 ],
-                'error' => 'validation_error'
+                'error' => 'validation_error',
             ], 422);
         }
 
@@ -94,24 +87,15 @@ class ProductController extends Controller
     {
         $this->authorize('update', $product);
 
-        $connection = config('database.default');
-        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
-            $connection = 'mongodb_testing';
-        }
-
         $categoryId = $request->input('category_id');
-        if ($categoryId) {
-            $categoryExists = DB::connection($connection)->table('categories')->where('_id', $categoryId)->exists();
-
-            if (!$categoryExists) {
-                return response()->json([
-                    'message' => 'The given data was invalid.',
-                    'errors' => [
-                        'category_id' => ['The selected category id is invalid.']
-                    ],
-                    'error' => 'validation_error'
-                ], 422);
-            }
+        if ($categoryId && ! $this->productRepository->categoryExists($categoryId)) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors' => [
+                    'category_id' => ['The selected category id is invalid.'],
+                ],
+                'error' => 'validation_error',
+            ], 422);
         }
 
         $data = $request->validate([
