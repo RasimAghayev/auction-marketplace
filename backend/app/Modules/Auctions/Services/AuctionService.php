@@ -122,7 +122,7 @@ class AuctionService
                 'completed_at' => now(),
             ]);
 
-            $winningBid->update(['status' => BidStatus::Winning]);
+            $winningBid->update(['status' => BidStatus::Won]);
 
             $reservePrice = $auction->reserve_price;
             if ($reservePrice && $winningBid->amount < $reservePrice) {

@@ -3,6 +3,7 @@
 namespace App\Modules\Auth\Repositories;
 
 use App\Models\User;
+use App\Models\Role;
 use App\Models\PersonalAccessToken;
 use App\Enums\UserRole;
 use Illuminate\Support\Facades\DB;
@@ -34,11 +35,27 @@ class AuthRepository
     public function assignDefaultRole(User $user): void
     {
         $connection = $user->getConnectionName();
+
         $roleId = DB::connection($connection)->table('roles')
             ->where('name', UserRole::User->value)
+            ->where('guard_name', 'sanctum')
             ->value('id');
 
-        if ($roleId) {
+        if (! $roleId) {
+            $role = Role::firstOrCreate([
+                'name' => UserRole::User->value,
+                'guard_name' => 'sanctum',
+            ]);
+            $roleId = $role->getKey();
+        }
+
+        $exists = DB::connection($connection)->table('model_has_roles')
+            ->where('model_id', $user->getKey())
+            ->where('model_type', User::class)
+            ->where('role_id', $roleId)
+            ->exists();
+
+        if (! $exists) {
             DB::connection($connection)->table('model_has_roles')->insert([
                 'model_id' => $user->getKey(),
                 'model_type' => User::class,

@@ -15,17 +15,19 @@ use App\Enums\ProductStatus;
 use App\Enums\AuctionStatus;
 use App\Modules\Users\Services\UserService;
 use App\Modules\Products\Repositories\ProductRepository;
-use App\Modules\Auctions\Repositories\AuctionRepository;
+use App\Modules\Auctions\Services\AuctionService;
 use App\Modules\Categories\Repositories\CategoryRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Cache;
 
 class AdminController extends Controller
 {
     public function __construct(
         protected UserService $userService,
         protected ProductRepository $productRepository,
+        protected AuctionService $auctionService,
         protected AuctionRepository $auctionRepository,
         protected CategoryRepository $categoryRepository
     ) {}
@@ -120,10 +122,19 @@ class AdminController extends Controller
         ]);
 
         if ($request->action === 'cancel') {
-            $auction->update(['status' => AuctionStatus::Cancelled->value]);
+            try {
+                $auction = $this->auctionService->cancel($auction);
+            } catch (\DomainException $e) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
             $message = 'Auction cancelled successfully.';
         } elseif ($request->action === 'extend') {
-            $auction->update(['end_date' => $request->end_date]);
+            try {
+                $auction->update(['end_date' => $request->end_date, 'version' => ($auction->version ?? 0) + 1]);
+                Cache::forget(\App\Modules\Auctions\Services\AuctionService::ACTIVE_AUCTIONS_CACHE_KEY);
+            } catch (\DomainException $e) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
             $message = 'Auction extended successfully.';
         }
 

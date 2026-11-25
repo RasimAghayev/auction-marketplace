@@ -11,7 +11,8 @@ class RateLimitMiddleware
 {
     public function handle(Request $request, Closure $next, int $maxAttempts = 60, float $decayMinutes = 1): Response
     {
-        $key = 'rate_limit:' . $request->ip() . ':' . $request->route()->getName() ?: 'unknown';
+        $routeName = $request->route()?->getName() ?: $request->method() . ':' . $request->path();
+        $key = 'rate_limit:' . $request->ip() . ':' . $routeName;
 
         $attempts = Cache::get($key, 0);
 

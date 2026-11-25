@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AuctionStatus;
+use App\Enums\BidStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Laravel\Eloquent\SoftDeletes;
@@ -87,6 +88,11 @@ class Auction extends BaseModel
     public function bids()
     {
         return $this->hasMany(Bid::class, 'auction_id')->orderBy('created_at', 'desc');
+    }
+
+    public function winningBid()
+    {
+        return $this->hasOne(Bid::class, 'auction_id')->where('status', BidStatus::Won->value);
     }
 
     public function participants()
