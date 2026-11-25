@@ -7,6 +7,7 @@ use App\Http\Resources\Api\V1\ProductResource;
 use App\Models\Product;
 use App\Enums\ProductStatus;
 use App\Modules\Products\Repositories\ProductRepository;
+use App\Modules\Products\Services\ImageUploadService;
 use App\Modules\Products\Services\ProductService;
 use App\Modules\Search\Services\SearchService;
 use DomainException;
@@ -19,7 +20,8 @@ class ProductController extends Controller
     public function __construct(
         protected ProductService $products,
         protected ProductRepository $productRepository,
-        protected SearchService $searchService
+        protected SearchService $searchService,
+        protected ImageUploadService $imageUploadService
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -132,14 +134,13 @@ class ProductController extends Controller
         $this->authorize('update', $product);
 
         $request->validate([
-            'images.*' => 'required|image|max:5120',
+            'images' => 'required|array|max:' . ImageUploadService::MAX_FILES,
+            'images.*' => 'image|max:' . ImageUploadService::MAX_FILE_SIZE_KB,
         ]);
 
-        $uploaded = [];
-        foreach ($request->file('images', []) as $image) {
-            $path = $image->store('products', 'public');
-            $uploaded[] = $path;
-        }
+        $uploaded = $this->imageUploadService->uploadMultiple(
+            $request->file('images', [])
+        );
 
         $product->images = array_merge($product->images ?? [], $uploaded);
         $product->save();
@@ -156,6 +157,8 @@ class ProductController extends Controller
 
         $images = $product->images ?? [];
         if (($key = array_search($image, $images)) !== false) {
+            $this->imageUploadService->delete($image);
+
             unset($images[$key]);
             $product->images = array_values($images);
             $product->save();

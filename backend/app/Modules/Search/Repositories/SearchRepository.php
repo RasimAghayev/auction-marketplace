@@ -2,29 +2,19 @@
 
 namespace App\Modules\Search\Repositories;
 
-use App\Models\Product;
+use App\Modules\Search\Contracts\SearchDriver;
+use App\Modules\Search\Drivers\SqlSearchDriver;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\App;
 
 class SearchRepository
 {
+    public function __construct(
+        protected SearchDriver $driver
+    ) {}
+
     public function products(string $query, array $filters = []): LengthAwarePaginator
     {
-        $qb = Product::with(['category', 'seller'])
-            ->where('status', 'published')
-            ->where('title', 'like', "%{$query}%");
-
-        if (isset($filters['category'])) {
-            $qb->whereHas('category', fn($c) => $c->where('slug', $filters['category']));
-        }
-
-        if (isset($filters['max_price'])) {
-            $qb->where('starting_price', '<=', $filters['max_price']);
-        }
-
-        if (isset($filters['min_price'])) {
-            $qb->where('starting_price', '>=', $filters['min_price']);
-        }
-
-        return $qb->latest()->paginate($filters['per_page'] ?? 12);
+        return $this->driver->search($query, $filters);
     }
 }

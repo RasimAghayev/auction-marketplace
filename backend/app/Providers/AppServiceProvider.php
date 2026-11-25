@@ -9,6 +9,8 @@ use App\Models\Permission;
 use App\Models\PersonalAccessToken;
 use App\Models\Product;
 use App\Models\Role;
+use App\Modules\Search\Contracts\SearchDriver;
+use App\Modules\Search\Drivers\SqlSearchDriver;
 use App\Policies\AuctionPolicy;
 use App\Policies\BidPolicy;
 use App\Policies\NotificationPolicy;
@@ -24,6 +26,8 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
+        $this->app->bind(SearchDriver::class, SqlSearchDriver::class);
     }
 
     public function boot(): void
