@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\ProductResource;
 use App\Models\Product;
 use App\Enums\ProductStatus;
+use App\Modules\Products\Repositories\ProductRepository;
 use App\Modules\Products\Services\ProductService;
+use App\Modules\Search\Services\SearchService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,41 +18,30 @@ use Illuminate\Support\Facades\DB;
 class ProductController extends Controller
 {
     public function __construct(
-        protected ProductService $products
+        protected ProductService $products,
+        protected ProductRepository $productRepository,
+        protected SearchService $searchService
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Product::with(['category', 'seller'])
-            ->where('status', ProductStatus::Published->value);
-
-        if ($request->has('category')) {
-            $query->whereHas('category', fn($q) => $q->where('slug', $request->category));
-        }
-
-        if ($request->has('search')) {
-            $query->where('title', 'like', "%{$request->search}%");
-        }
-
-        $products = $query->latest()->paginate($request->integer('per_page', 12));
+        $products = $this->productRepository->paginate([
+            'category' => $request->category,
+            'search' => $request->search,
+            'per_page' => $request->integer('per_page', 12),
+        ]);
 
         return ProductResource::collection($products);
     }
 
     public function search(Request $request): AnonymousResourceCollection
     {
-        $query = Product::with(['category', 'seller'])
-            ->where('status', ProductStatus::Published->value);
-
-        if ($request->has('q')) {
-            $query->where('title', 'like', "%{$request->q}%");
-        }
-
-        if ($request->has('category')) {
-            $query->whereHas('category', fn($q) => $q->where('slug', $request->category));
-        }
-
-        $products = $query->latest()->paginate($request->integer('per_page', 12));
+        $products = $this->searchService->products($request->q, [
+            'category' => $request->category,
+            'max_price' => $request->max_price,
+            'min_price' => $request->min_price,
+            'per_page' => $request->integer('per_page', 12),
+        ]);
 
         return ProductResource::collection($products);
     }
