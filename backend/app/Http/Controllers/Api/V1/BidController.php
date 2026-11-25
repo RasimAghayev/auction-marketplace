@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\BidResource;
 use App\Models\Auction;
-use App\Models\Bid;
+use App\Modules\Bids\Repositories\BidRepository;
 use App\Modules\Bids\Services\BidService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,15 +14,15 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 class BidController extends Controller
 {
     public function __construct(
-        protected BidService $bids
+        protected BidService $bids,
+        protected BidRepository $bidRepository
     ) {}
 
     public function index(Auction $auction): AnonymousResourceCollection
     {
-        $bids = $auction->bids()
-            ->with('user')
-            ->latest('amount')
-            ->paginate(20);
+        $bids = $this->bidRepository->forAuction((string) $auction->id, [
+            'per_page' => 20,
+        ]);
 
         return BidResource::collection($bids);
     }
@@ -49,10 +49,9 @@ class BidController extends Controller
 
     public function myBids(Request $request): AnonymousResourceCollection
     {
-        $bids = Bid::with(['auction.product.category'])
-            ->where('user_id', $request->user()->id)
-            ->latest()
-            ->paginate(20);
+        $bids = $this->bidRepository->byUser((string) $request->user()->id, [
+            'per_page' => 20,
+        ]);
 
         return BidResource::collection($bids);
     }

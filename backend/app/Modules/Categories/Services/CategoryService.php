@@ -4,24 +4,18 @@ namespace App\Modules\Categories\Services;
 
 use App\Models\Auction;
 use App\Models\Category;
+use App\Modules\Categories\Repositories\CategoryRepository;
 use Illuminate\Support\Collection;
 
 class CategoryService
 {
+    public function __construct(
+        protected CategoryRepository $repository
+    ) {}
+
     public function list(): Collection
     {
-        $categories = Category::where('is_active', true)
-            ->orderBy('name')
-            ->get();
-
-        foreach ($categories as $category) {
-            $category->products_count = $category->products()->count();
-            $category->active_auctions_count = Auction::whereHas('product', function ($q) use ($category) {
-                $q->where('category_id', (string) $category->id);
-            })->where('status', 'active')->count();
-        }
-
-        return $categories;
+        return $this->repository->list();
     }
 
     public function find(Category $category): Category
