@@ -14,12 +14,17 @@ use App\Models\Notification;
 use App\Enums\ProductStatus;
 use App\Enums\AuctionStatus;
 use App\Enums\BidStatus;
+use App\Modules\Notifications\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        protected NotificationService $notificationService
+    ) {}
+
     public function overview(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -35,9 +40,7 @@ class DashboardController extends Controller
             'pending_bids_count' => Bid::where('user_id', $user->id)
                 ->where('status', BidStatus::Pending->value)
                 ->count(),
-            'unread_notifications_count' => Notification::where('user_id', $user->id)
-                ->whereNull('read_at')
-                ->count(),
+            'unread_notifications_count' => $this->notificationService->unreadCount($user->id),
             'total_spent' => Bid::where('user_id', $user->id)
                 ->where('status', BidStatus::Won->value)
                 ->sum('amount'),
@@ -108,9 +111,9 @@ class DashboardController extends Controller
 
     public function notifications(Request $request): AnonymousResourceCollection
     {
-        $notifications = Notification::where('user_id', $request->user()->id)
-            ->latest()
-            ->paginate($request->integer('per_page', 20));
+        $notifications = $this->notificationService->forUser($request->user()->id, [
+            'per_page' => $request->integer('per_page', 20),
+        ]);
 
         return NotificationResource::collection($notifications);
     }
@@ -119,7 +122,7 @@ class DashboardController extends Controller
     {
         $this->authorize('view', $notification);
 
-        $notification->update(['read_at' => now()]);
+        $notification = $this->notificationService->markAsRead($notification);
 
         return response()->json([
             'message' => 'Notification marked as read.',
@@ -129,9 +132,7 @@ class DashboardController extends Controller
 
     public function markAllNotificationsRead(Request $request): JsonResponse
     {
-        Notification::where('user_id', $request->user()->id)
-            ->whereNull('read_at')
-            ->update(['read_at' => now()]);
+        $this->notificationService->markAllAsRead($request->user()->id);
 
         return response()->json(['message' => 'All notifications marked as read.']);
     }
