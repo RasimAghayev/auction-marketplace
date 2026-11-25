@@ -20,7 +20,6 @@ use App\Modules\Categories\Repositories\CategoryRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\DB;
 
 class AdminController extends Controller
 {
@@ -33,19 +32,7 @@ class AdminController extends Controller
 
     public function dashboard(): JsonResponse
     {
-        return response()->json([
-            'users_count' => User::count(),
-            'products_count' => Product::count(),
-            'auctions_count' => Auction::count(),
-            'categories_count' => Category::count(),
-            'pending_products_count' => Product::where('status', ProductStatus::Draft->value)->count(),
-            'active_auctions_count' => Auction::where('status', AuctionStatus::Active->value)->count(),
-            'revenue' => Auction::where('status', AuctionStatus::Completed->value)
-                ->whereNotNull('winning_bid_id')
-                ->with('winningBid')
-                ->get()
-                ->sum(fn($a) => $a->winningBid?->amount ?? 0),
-        ]);
+        return response()->json($this->userService->dashboardStats());
     }
 
     public function users(Request $request): AnonymousResourceCollection

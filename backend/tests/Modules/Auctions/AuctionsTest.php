@@ -7,6 +7,7 @@ use App\Models\Auction;
 use App\Enums\UserRole;
 use App\Enums\ProductStatus;
 use App\Enums\AuctionStatus;
+use App\Enums\BidStatus;
 use Laravel\Sanctum\Sanctum;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\TestCase as LaravelTestCase;
@@ -169,5 +170,88 @@ describe('Auctions Module', function () {
         expect(count($activeAuctions))->toBeGreaterThan(0);
 
         Cache::forget('auctions:active');
+    });
+
+    test('seller can complete an active auction with winning bid', function () {
+        Sanctum::actingAs($this->seller);
+
+        $auction = Auction::factory()->create([
+            'product_id' => $this->product->id,
+            'seller_id' => $this->seller->id,
+            'status' => AuctionStatus::Active,
+            'current_price' => 150.00,
+            'start_date' => Carbon::now()->subHour(),
+            'end_date' => Carbon::now()->subMinutes(30),
+        ]);
+
+        $bid = Bid::factory()->create([
+            'auction_id' => $auction->id,
+            'user_id' => User::factory()->create([
+                'email' => 'bidder@example.com',
+                'role' => UserRole::User->value,
+                'is_active' => true,
+            ])->id,
+            'amount' => 150.00,
+            'status' => BidStatus::Accepted,
+        ]);
+
+        $response = $this->postJson("/api/v1/auctions/{$auction->id}/complete");
+
+        $response->assertStatus(200);
+        $response->assertJsonFragment(['status' => 'completed']);
+    });
+
+    test('seller can complete an active auction without bids (unsold)', function () {
+        Sanctum::actingAs($this->seller);
+
+        $auction = Auction::factory()->create([
+            'product_id' => $this->product->id,
+            'seller_id' => $this->seller->id,
+            'status' => AuctionStatus::Active,
+            'current_price' => 100.00,
+            'start_date' => Carbon::now()->subHour(),
+            'end_date' => Carbon::now()->subMinutes(30),
+        ]);
+
+        $response = $this->postJson("/api/v1/auctions/{$auction->id}/complete");
+
+        $response->assertStatus(200);
+        $response->assertJsonFragment(['status' => 'completed']);
+    });
+
+    test('non-seller cannot complete an auction', function () {
+        $buyer = User::factory()->create([
+            'name' => 'Buyer',
+            'email' => 'buyer@example.com',
+            'password' => 'password123',
+            'role' => UserRole::User->value,
+            'is_active' => true,
+        ]);
+
+        Sanctum::actingAs($buyer);
+
+        $auction = Auction::factory()->create([
+            'product_id' => $this->product->id,
+            'seller_id' => $this->seller->id,
+            'status' => AuctionStatus::Active,
+        ]);
+
+        $response = $this->postJson("/api/v1/auctions/{$auction->id}/complete");
+
+        $response->assertStatus(403);
+    });
+
+    test('cannot complete an already completed auction', function () {
+        Sanctum::actingAs($this->seller);
+
+        $auction = Auction::factory()->create([
+            'product_id' => $this->product->id,
+            'seller_id' => $this->seller->id,
+            'status' => AuctionStatus::Completed,
+        ]);
+
+        $response = $this->postJson("/api/v1/auctions/{$auction->id}/complete");
+
+        $response->assertStatus(422);
     });
 });
