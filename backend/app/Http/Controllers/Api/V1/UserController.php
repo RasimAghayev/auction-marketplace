@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Modules\Users\Services\UserService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
