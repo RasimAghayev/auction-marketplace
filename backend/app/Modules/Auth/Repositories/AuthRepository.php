@@ -42,7 +42,7 @@ class AuthRepository
             ->value('id');
 
         if (! $roleId) {
-            $role = Role::firstOrCreate([
+            $role = Role::on($connection)->firstOrCreate([
                 'name' => UserRole::User->value,
                 'guard_name' => 'sanctum',
             ]);

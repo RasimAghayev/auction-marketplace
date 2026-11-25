@@ -1,66 +1,137 @@
 name: CI
 
+# Docker-first pipeline (CLAUDE.md standing decision 2): every check that needs the
+# backend/frontend stack runs through this repo's own infra/compose.yaml test
+# profiles instead of invoking php/composer/node/npm directly on the runner.
+# This also fixes two defects found 2026-11-25:
+#   - the previous workflow ran composer/pest and npm/vite straight on ubuntu-latest,
+#     never exercising this repo's own Dockerfiles at all;
+#   - the previous backend-tests job had `continue-on-error: true`, so a red test
+#     suite still reported CI as green.
+
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, preview, test]
     paths:
       - 'backend/**'
       - 'frontend/**'
       - 'infra/**'
-      - '.github/workflows/**'
+      - '.github/workflows/ci.yml'
   pull_request:
-    branches: [master, main]
+    branches: [master, main, preview, test]
     paths:
       - 'backend/**'
       - 'frontend/**'
       - 'infra/**'
-      - '.github/workflows/**'
+      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COMPOSE_FILE: infra/compose.yaml
+
 jobs:
+  prepare-secrets:
+    name: Generate ephemeral CI secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      cache-key: ${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Generate throwaway local secret files (never committed, CI-only)
+        run: |
+          mkdir -p secrets
+          openssl rand -base64 32 > secrets/mongodb_root_password.txt
+          echo "ci-admin" > secrets/mongodb_root_username.txt
+          openssl rand -base64 32 > secrets/redis_password.txt
+          openssl rand -base64 32 > secrets/mongo_express_password.txt
+          echo "ci-admin" > secrets/mongo_express_user.txt
+          openssl rand -base64 32 > secrets/redis_commander_password.txt
+          echo "ci-admin" > secrets/redis_commander_user.txt
+          openssl rand -base64 32 > secrets/grafana_admin_password.txt
+          echo "ci-admin" > secrets/grafana_admin_user.txt
+      - name: Upload secrets as a run-scoped artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-secrets-${{ github.run_id }}
+          path: secrets/
+          retention-days: 1
+
   backend-tests:
+    name: Backend tests (Docker test-backend profile)
+    needs: prepare-secrets
     runs-on: ubuntu-latest
-    services:
-      mongodb:
-        image: mongo:8
-        ports:
-          - 27017:27017
-      redis:
-        image: redis:8
-        ports:
-          - 6379:6379
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/download-artifact@v4
         with:
-          php-version: '8.4'
-          extensions: mongodb, redis
-      - name: Prepare cache dir
-        working-directory: backend
-        run: mkdir -p bootstrap/cache storage/framework/{cache,sessions,views} storage/logs
-      - name: Install dependencies
-        working-directory: backend
-        run: composer install --no-interaction --prefer-dist
-      - name: Run tests
-        working-directory: backend
-        continue-on-error: true
-        run: vendor/bin/pest
-        env:
-          APP_ENV: testing
-          DB_CONNECTION: mongodb_testing
+          name: ci-secrets-${{ github.run_id }}
+          path: secrets/
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Start core infra (mongodb, redis)
+        run: docker compose -f "$COMPOSE_FILE" --profile core up -d mongodb redis
+      - name: Wait for infra health
+        run: |
+          for i in $(seq 1 30); do
+            status=$(docker compose -f "$COMPOSE_FILE" ps --format json mongodb redis | grep -c '"Health":"healthy"' || true)
+            if [ "$status" -ge 2 ]; then echo "infra healthy"; exit 0; fi
+            sleep 2
+          done
+          echo "infra did not become healthy in time" >&2
+          docker compose -f "$COMPOSE_FILE" ps
+          exit 1
+      - name: Run backend test suite in Docker (test-backend profile)
+        run: |
+          docker compose -f "$COMPOSE_FILE" --profile backend-test run --rm test-backend
+      - name: Collect logs on failure
+        if: failure()
+        run: docker compose -f "$COMPOSE_FILE" logs --tail=200
+      - name: Tear down
+        if: always()
+        run: docker compose -f "$COMPOSE_FILE" --profile core --profile backend-test down -v
 
-  frontend-build:
+  frontend-tests:
+    name: Frontend unit tests (Docker test-frontend profile)
+    needs: prepare-secrets
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 22
-      - name: Install
-        working-directory: frontend
-        run: npm install
-      - name: Build
-        working-directory: frontend
-        run: npx vite build
+          name: ci-secrets-${{ github.run_id }}
+          path: secrets/
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build frontend base image (needed by test-frontend)
+        run: docker compose -f "$COMPOSE_FILE" --profile core build frontend
+      - name: Run frontend unit tests in Docker (test-frontend profile)
+        run: docker compose -f "$COMPOSE_FILE" --profile frontend-test run --rm test-frontend
+      - name: Collect logs on failure
+        if: failure()
+        run: docker compose -f "$COMPOSE_FILE" logs --tail=200
+      - name: Tear down
+        if: always()
+        run: docker compose -f "$COMPOSE_FILE" --profile core --profile frontend-test down -v
 
-
+  image-build:
+    name: Production image build validation
+    needs: prepare-secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-secrets-${{ github.run_id }}
+          path: secrets/
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build backend + frontend production images (no run, build-only)
+        run: docker compose -f "$COMPOSE_FILE" --profile core build backend frontend

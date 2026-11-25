@@ -81,8 +81,8 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: ../docker/php/Dockerfile
+      context: ../backend
+      dockerfile: ../infra/docker/php/Dockerfile
       target: prod
       args:
         - UID=1000
@@ -93,9 +93,9 @@ services:
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
       - APP_URL=${APP_URL:-http://localhost}
-      - APP_KEY=base64:5tHlvpjXZZ6E5WHImfqNWTp+xI9I3DeLpaT0kUdHNmE=
+      - "APP_KEY=${APP_KEY:?set APP_KEY in your .env - generate with 'php artisan key:generate --show'; never hardcode it here}"
       - DB_CONNECTION=mongodb
-      - MONGODB_URI=${MONGODB_URI:-mongodb://admin:f841mu3Nmi1cUZme755cX%2FTCWyB13ZeHoohRUe3WqmQ%3D@mongodb:27017/?authSource=admin}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://admin:4Y4fEgzujaOswRlFJcKF0nC2VpZ0ZZUB@mongodb:27017/?authSource=admin}
       - MONGODB_DATABASE=${MONGODB_DATABASE:-auction_marketplace}
       - REDIS_HOST=redis
       - REDIS_PASSWORD_FILE=/run/secrets/redis_password
@@ -107,8 +107,8 @@ services:
       - CACHE_DRIVER=redis
       - SESSION_DRIVER=redis
     volumes:
-      - ./backend/storage:/var/www/html/storage:rw
-      - ./backend/bootstrap/cache:/var/www/html/bootstrap/cache:rw
+      - ../backend/storage:/var/www/html/storage:rw
+      - ../backend/bootstrap/cache:/var/www/html/bootstrap/cache:rw
     networks:
       - backend-internal
       - frontend-network
@@ -145,8 +145,8 @@ services:
 
   reverb:
     build:
-      context: ./backend
-      dockerfile: ../docker/php/Dockerfile
+      context: ../backend
+      dockerfile: ../infra/docker/php/Dockerfile
       target: prod
     image: ${REGISTRY:-local}/auction-reverb:${TAG:-latest}
     container_name: auction-reverb
@@ -195,8 +195,8 @@ services:
 
   queue-worker:
     build:
-      context: ./backend
-      dockerfile: ../docker/php/Dockerfile
+      context: ../backend
+      dockerfile: ../infra/docker/php/Dockerfile
       target: prod
     image: ${REGISTRY:-local}/auction-queue:${TAG:-latest}
     profiles: ["core", "workers"]
@@ -204,9 +204,9 @@ services:
     environment:
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
-      - APP_KEY=base64:5tHlvpjXZZ6E5WHImfqNWTp+xI9I3DeLpaT0kUdHNmE=
+      - "APP_KEY=${APP_KEY:?set APP_KEY in your .env - generate with 'php artisan key:generate --show'; never hardcode it here}"
       - DB_CONNECTION=mongodb
-      - MONGODB_URI=${MONGODB_URI:-mongodb://admin:f841mu3Nmi1cUZme755cX%2FTCWyB13ZeHoohRUe3WqmQ%3D@mongodb:27017/?authSource=admin}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://admin:4Y4fEgzujaOswRlFJcKF0nC2VpZ0ZZUB@mongodb:27017/?authSource=admin}
       - MONGODB_DATABASE=${MONGODB_DATABASE:-auction_marketplace}
       - REDIS_HOST=redis
       - REDIS_PASSWORD_FILE=/run/secrets/redis_password
@@ -241,8 +241,8 @@ services:
 
   scheduler:
     build:
-      context: ./backend
-      dockerfile: ../docker/php/Dockerfile
+      context: ../backend
+      dockerfile: ../infra/docker/php/Dockerfile
       target: prod
     image: ${REGISTRY:-local}/auction-scheduler:${TAG:-latest}
     container_name: auction-scheduler
@@ -251,9 +251,9 @@ services:
     environment:
       - APP_ENV=${APP_ENV:-production}
       - APP_DEBUG=${APP_DEBUG:-false}
-      - APP_KEY=base64:5tHlvpjXZZ6E5WHImfqNWTp+xI9I3DeLpaT0kUdHNmE=
+      - "APP_KEY=${APP_KEY:?set APP_KEY in your .env - generate with 'php artisan key:generate --show'; never hardcode it here}"
       - DB_CONNECTION=mongodb
-      - MONGODB_URI=${MONGODB_URI:-mongodb://admin:f841mu3Nmi1cUZme755cX%2FTCWyB13ZeHoohRUe3WqmQ%3D@mongodb:27017/?authSource=admin}
+      - MONGODB_URI=${MONGODB_URI:-mongodb://admin:4Y4fEgzujaOswRlFJcKF0nC2VpZ0ZZUB@mongodb:27017/?authSource=admin}
       - MONGODB_DATABASE=${MONGODB_DATABASE:-auction_marketplace}
       - REDIS_HOST=redis
       - REDIS_PASSWORD_FILE=/run/secrets/redis_password
@@ -290,8 +290,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: ../docker/frontend/Dockerfile
+      context: ../frontend
+      dockerfile: ../infra/docker/frontend/Dockerfile
       target: production
     image: ${REGISTRY:-local}/auction-frontend:${TAG:-latest}
     container_name: auction-frontend
@@ -323,8 +323,8 @@ services:
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./backend/public:/var/www/html/public:ro
-      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ../backend/public:/var/www/html/public:ro
+      - ../frontend/dist:/usr/share/nginx/html:ro
     networks:
       - frontend-network
     depends_on:
@@ -540,8 +540,8 @@ services:
   # Development test runner (testing profile)
   test-runner:
     build:
-      context: ./backend
-      dockerfile: ../docker/php/Dockerfile
+      context: ../backend
+      dockerfile: ../infra/docker/php/Dockerfile
       target: dev
     image: ${REGISTRY:-local}/auction-test:${TAG:-latest}
     container_name: auction-test-runner
@@ -559,7 +559,7 @@ services:
       - QUEUE_CONNECTION=redis
       - CACHE_DRIVER=redis
     volumes:
-      - ./backend:/var/www/html
+      - ../backend:/var/www/html
     networks:
       - backend-internal
     depends_on:
@@ -578,8 +578,8 @@ services:
   # Backend unit/feature test runner (testing profile)
   test-backend:
     build:
-      context: ./backend
-      dockerfile: ../docker/php/Dockerfile
+      context: ../backend
+      dockerfile: ../infra/docker/php/Dockerfile
       target: dev
     image: ${REGISTRY:-local}/auction-test-backend:${TAG:-latest}
     container_name: auction-test-backend
@@ -598,8 +598,8 @@ services:
       - QUEUE_CONNECTION=sync
       - CACHE_DRIVER=array
     volumes:
-      - ./backend:/var/www/html
-      - ./backend/tests:/var/www/html/tests:ro
+      - ../backend:/var/www/html
+      - ../backend/tests:/var/www/html/tests:ro
     networks:
       - backend-internal
     depends_on:
@@ -618,8 +618,8 @@ services:
   # Backend BDD test runner (testing profile)
   test-bdd:
     build:
-      context: ./backend
-      dockerfile: ../docker/php/Dockerfile
+      context: ../backend
+      dockerfile: ../infra/docker/php/Dockerfile
       target: dev
     image: ${REGISTRY:-local}/auction-test-bdd:${TAG:-latest}
     container_name: auction-test-bdd
@@ -638,8 +638,8 @@ services:
       - QUEUE_CONNECTION=sync
       - CACHE_DRIVER=array
     volumes:
-      - ./backend:/var/www/html
-      - ./backend/tests/BDD:/var/www/html/tests/BDD:ro
+      - ../backend:/var/www/html
+      - ../backend/tests/BDD:/var/www/html/tests/BDD:ro
     networks:
       - backend-internal
     depends_on:
@@ -658,8 +658,8 @@ services:
   # ATDD test runner (testing profile)
   test-atdd:
     build:
-      context: ./backend
-      dockerfile: ../docker/php/Dockerfile
+      context: ../backend
+      dockerfile: ../infra/docker/php/Dockerfile
       target: dev
     image: ${REGISTRY:-local}/auction-test-atdd:${TAG:-latest}
     container_name: auction-test-atdd
@@ -678,8 +678,8 @@ services:
       - QUEUE_CONNECTION=sync
       - CACHE_DRIVER=array
     volumes:
-      - ./backend:/var/www/html
-      - ./backend/tests/ATDD:/var/www/html/tests/ATDD:ro
+      - ../backend:/var/www/html
+      - ../backend/tests/ATDD:/var/www/html/tests/ATDD:ro
     networks:
       - backend-internal
     depends_on:
@@ -698,8 +698,8 @@ services:
   # Frontend test runner (testing profile)
   test-frontend:
     build:
-      context: ./frontend
-      dockerfile: ../docker/frontend/Dockerfile
+      context: ../frontend
+      dockerfile: ../infra/docker/frontend/Dockerfile
       target: dev
     image: ${REGISTRY:-local}/auction-test-frontend:${TAG:-latest}
     container_name: auction-test-frontend
@@ -710,8 +710,8 @@ services:
       - NODE_ENV=test
       - VITEST_POOL=forks
     volumes:
-      - ./frontend:/app
-      - ./frontend/tests:/app/tests:ro
+      - ../frontend:/app
+      - ../frontend/tests:/app/tests:ro
     networks:
       - frontend-network
     depends_on:
@@ -726,8 +726,8 @@ services:
   # Playwright E2E test runner (testing profile)
   test-e2e:
     build:
-      context: ./frontend
-      dockerfile: ../docker/frontend/Dockerfile
+      context: ../frontend
+      dockerfile: ../infra/docker/frontend/Dockerfile
       target: dev
     image: ${REGISTRY:-local}/auction-test-e2e:${TAG:-latest}
     container_name: auction-test-e2e
@@ -739,8 +739,8 @@ services:
       - PLAYWRIGHT_BASE_URL=http://frontend:5173
       - API_BASE_URL=http://backend:9000/api
     volumes:
-      - ./frontend:/app
-      - ./frontend/tests/e2e:/app/tests/e2e:ro
+      - ../frontend:/app
+      - ../frontend/tests/e2e:/app/tests/e2e:ro
     networks:
       - frontend-network
       - backend-internal
@@ -758,8 +758,8 @@ services:
   # Playwright API test runner (testing profile)
   test-api:
     build:
-      context: ./frontend
-      dockerfile: ../docker/frontend/Dockerfile
+      context: ../frontend
+      dockerfile: ../infra/docker/frontend/Dockerfile
       target: dev
     image: ${REGISTRY:-local}/auction-test-api:${TAG:-latest}
     container_name: auction-test-api
@@ -770,8 +770,8 @@ services:
       - NODE_ENV=test
       - API_BASE_URL=http://backend:9000/api
     volumes:
-      - ./frontend:/app
-      - ./frontend/tests/e2e:/app/tests/e2e:ro
+      - ../frontend:/app
+      - ../frontend/tests/e2e:/app/tests/e2e:ro
     networks:
       - backend-internal
     depends_on:
@@ -830,20 +830,20 @@ volumes:
 
 secrets:
   mongodb_root_username:
-    file: ./secrets/mongodb_root_username.txt
+    file: ../secrets/mongodb_root_username.txt
   mongodb_root_password:
-    file: ./secrets/mongodb_root_password.txt
+    file: ../secrets/mongodb_root_password.txt
   redis_password:
-    file: ./secrets/redis_password.txt
+    file: ../secrets/redis_password.txt
   mongo_express_user:
-    file: ./secrets/mongo_express_user.txt
+    file: ../secrets/mongo_express_user.txt
   mongo_express_password:
-    file: ./secrets/mongo_express_password.txt
+    file: ../secrets/mongo_express_password.txt
   redis_commander_user:
-    file: ./secrets/redis_commander_user.txt
+    file: ../secrets/redis_commander_user.txt
   redis_commander_password:
-    file: ./secrets/redis_commander_password.txt
+    file: ../secrets/redis_commander_password.txt
   grafana_admin_user:
-    file: ./secrets/grafana_admin_user.txt
+    file: ../secrets/grafana_admin_user.txt
   grafana_admin_password:
-    file: ./secrets/grafana_admin_password.txt
+    file: ../secrets/grafana_admin_password.txt
