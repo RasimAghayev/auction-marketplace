@@ -4,6 +4,7 @@ namespace App\Modules\Categories\Repositories;
 
 use App\Models\Auction;
 use App\Models\Category;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
 class CategoryRepository
@@ -69,5 +70,16 @@ class CategoryRepository
     public function delete(Category $category): void
     {
         $category->delete();
+    }
+
+    public function adminPaginate(array $filters = []): LengthAwarePaginator
+    {
+        $query = Category::with('children')
+            ->when($filters['search'] ?? null, fn($q) => $q->where('name', 'like', "%{$filters['search']}%"))
+            ->when($filters['is_active'] ?? null, fn($q) => $q->where('is_active', $filters['is_active']))
+            ->whereNull('parent_id')
+            ->latest();
+
+        return $query->paginate($filters['per_page'] ?? 20);
     }
 }

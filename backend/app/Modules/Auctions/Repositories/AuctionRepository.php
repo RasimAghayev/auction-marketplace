@@ -39,6 +39,7 @@ class AuctionRepository
         $query = Auction::with(['product.category', 'seller'])
             ->when($filters['status'] ?? null, fn($q) => $q->where('status', $filters['status']))
             ->when($filters['seller_id'] ?? null, fn($q) => $q->where('seller_id', $filters['seller_id']))
+            ->when($filters['search'] ?? null, fn($q) => $q->whereHas('product', fn($p) => $p->where('title', 'like', "%{$filters['search']}%")))
             ->latest();
 
         return $query->paginate($filters['per_page'] ?? 20);

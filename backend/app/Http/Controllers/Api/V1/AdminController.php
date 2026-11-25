@@ -14,6 +14,9 @@ use App\Models\Category;
 use App\Enums\ProductStatus;
 use App\Enums\AuctionStatus;
 use App\Modules\Users\Services\UserService;
+use App\Modules\Products\Repositories\ProductRepository;
+use App\Modules\Auctions\Repositories\AuctionRepository;
+use App\Modules\Categories\Repositories\CategoryRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -22,7 +25,10 @@ use Illuminate\Support\Facades\DB;
 class AdminController extends Controller
 {
     public function __construct(
-        protected UserService $userService
+        protected UserService $userService,
+        protected ProductRepository $productRepository,
+        protected AuctionRepository $auctionRepository,
+        protected CategoryRepository $categoryRepository
     ) {}
 
     public function dashboard(): JsonResponse
@@ -81,11 +87,11 @@ class AdminController extends Controller
 
     public function products(Request $request): AnonymousResourceCollection
     {
-        $products = Product::with(['category', 'seller'])
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->when($request->search, fn($q) => $q->where('title', 'like', "%{$request->search}%"))
-            ->latest()
-            ->paginate($request->integer('per_page', 20));
+        $products = $this->productRepository->adminPaginate([
+            'status' => $request->status,
+            'search' => $request->search,
+            'per_page' => $request->integer('per_page', 20),
+        ]);
 
         return ProductResource::collection($products);
     }
@@ -110,10 +116,11 @@ class AdminController extends Controller
 
     public function auctions(Request $request): AnonymousResourceCollection
     {
-        $auctions = Auction::with(['product.category', 'seller'])
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->latest()
-            ->paginate($request->integer('per_page', 20));
+        $auctions = $this->auctionRepository->paginate([
+            'status' => $request->status,
+            'search' => $request->search,
+            'per_page' => $request->integer('per_page', 20),
+        ]);
 
         return AuctionResource::collection($auctions);
     }
@@ -141,46 +148,41 @@ class AdminController extends Controller
 
     public function categories(Request $request): AnonymousResourceCollection
     {
-        $categories = Category::with('children')
-            ->whereNull('parent_id')
-            ->latest()
-            ->paginate($request->integer('per_page', 20));
+        $categories = $this->categoryRepository->adminPaginate([
+            'search' => $request->search,
+            'per_page' => $request->integer('per_page', 20),
+        ]);
 
         return CategoryResource::collection($categories);
     }
 
     public function storeCategory(Request $request): JsonResponse
     {
-        $connection = config('database.default');
-        if (app()->environment('testing')) {
-            $connection = 'mongodb_testing';
-        }
-
         // Manual validation for slug uniqueness and parent_id
         $slug = $request->input('slug');
-        $slugExists = DB::connection($connection)->table('categories')->where('slug', $slug)->exists();
-        
+        $slugExists = $this->categoryRepository->findBySlug($slug);
+
         if ($slugExists) {
             return response()->json([
                 'message' => 'The given data was invalid.',
                 'errors' => [
-                    'slug' => ['The slug has already been taken.']
+                    'slug' => ['The slug has already been taken.'],
                 ],
-                'error' => 'validation_error'
+                'error' => 'validation_error',
             ], 422);
         }
 
         $parentId = $request->input('parent_id');
         if ($parentId) {
-            $parentExists = DB::connection($connection)->table('categories')->where('id', $parentId)->exists();
-            
+            $parentExists = $this->categoryRepository->findById($parentId);
+
             if (!$parentExists) {
                 return response()->json([
                     'message' => 'The given data was invalid.',
                     'errors' => [
-                        'parent_id' => ['The selected parent id is invalid.']
+                        'parent_id' => ['The selected parent id is invalid.'],
                     ],
-                    'error' => 'validation_error'
+                    'error' => 'validation_error',
                 ], 422);
             }
         }
@@ -191,7 +193,7 @@ class AdminController extends Controller
             'icon' => 'nullable|string|max:255',
         ]);
 
-        $category = Category::create($data);
+        $category = $this->categoryRepository->create($data);
 
         return response()->json([
             'message' => 'Category created successfully.',
@@ -201,38 +203,33 @@ class AdminController extends Controller
 
     public function updateCategory(Request $request, Category $category): JsonResponse
     {
-        $connection = config('database.default');
-        if (app()->environment('testing')) {
-            $connection = 'mongodb_testing';
-        }
-
         // Manual validation for slug uniqueness and parent_id
         $slug = $request->input('slug');
         if ($slug && $slug !== $category->slug) {
-            $slugExists = DB::connection($connection)->table('categories')->where('slug', $slug)->exists();
-            
+            $slugExists = $this->categoryRepository->findBySlug($slug);
+
             if ($slugExists) {
                 return response()->json([
                     'message' => 'The given data was invalid.',
                     'errors' => [
-                        'slug' => ['The slug has already been taken.']
+                        'slug' => ['The slug has already been taken.'],
                     ],
-                    'error' => 'validation_error'
+                    'error' => 'validation_error',
                 ], 422);
             }
         }
 
         $parentId = $request->input('parent_id');
         if ($parentId) {
-            $parentExists = DB::connection($connection)->table('categories')->where('id', $parentId)->exists();
-            
+            $parentExists = $this->categoryRepository->findById($parentId);
+
             if (!$parentExists) {
                 return response()->json([
                     'message' => 'The given data was invalid.',
                     'errors' => [
-                        'parent_id' => ['The selected parent id is invalid.']
+                        'parent_id' => ['The selected parent id is invalid.'],
                     ],
-                    'error' => 'validation_error'
+                    'error' => 'validation_error',
                 ], 422);
             }
         }
@@ -244,7 +241,7 @@ class AdminController extends Controller
             'is_active' => 'sometimes|boolean',
         ]);
 
-        $category->update($data);
+        $category = $this->categoryRepository->update($category, $data);
 
         return response()->json([
             'message' => 'Category updated successfully.',
@@ -260,7 +257,7 @@ class AdminController extends Controller
             ], 422);
         }
 
-        $category->delete();
+        $this->categoryRepository->delete($category);
 
         return response()->json(['message' => 'Category deleted successfully.']);
     }

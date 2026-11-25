@@ -34,6 +34,17 @@ class ProductRepository
         return $query->latest()->paginate($filters['per_page'] ?? 12);
     }
 
+    public function adminPaginate(array $filters = []): LengthAwarePaginator
+    {
+        $query = Product::with(['category', 'seller'])
+            ->when($filters['status'] ?? null, fn($q) => $q->where('status', $filters['status']))
+            ->when($filters['category'] ?? null, fn($q) => $q->whereHas('category', fn($c) => $c->where('slug', $filters['category'])))
+            ->when($filters['search'] ?? null, fn($q) => $q->where('title', 'like', "%{$filters['search']}%"))
+            ->when($filters['seller_id'] ?? null, fn($q) => $q->where('seller_id', $filters['seller_id']));
+
+        return $query->latest()->paginate($filters['per_page'] ?? 20);
+    }
+
     public function create(array $attributes): Product
     {
         return Product::create($attributes);
