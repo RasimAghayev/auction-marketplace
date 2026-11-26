@@ -14,18 +14,29 @@ use App\Enums\BidStatus;
 use Laravel\Sanctum\Sanctum;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\TestCase as LaravelTestCase;
+use Illuminate\Support\Facades\DB;
 
 uses(LaravelTestCase::class);
 
 beforeEach(function () {
-    // Debug: write to file
-    file_put_contents('/tmp/test_debug.log', "=== beforeEach STARTED ===\n", FILE_APPEND);
-    
-    // Debug Role connection
-    $roleModel = new \App\Models\Role();
-    $connName = $roleModel->getConnectionName();
-    file_put_contents('/tmp/test_debug.log', "Role connection: $connName\n", FILE_APPEND);
-    
+    foreach (['users', 'products', 'categories', 'auctions', 'bids', 'notifications', 'model_has_roles', 'personal_access_tokens'] as $collection) {
+        DB::connection('mongodb_testing')->table($collection)->delete();
+    }
+
+    foreach (['user', 'seller', 'admin'] as $roleName) {
+        $roleId = 'role_' . $roleName;
+        DB::connection('mongodb_testing')->table('roles')->updateOrInsert(
+            ['_id' => $roleId],
+            [
+                'id' => $roleId,
+                'name' => $roleName,
+                'guard_name' => 'sanctum',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
+            ]
+        );
+    }
+
     $this->user = User::factory()->create([
         'name' => 'Test User',
         'email' => 'test@example.com',
@@ -34,12 +45,11 @@ beforeEach(function () {
         'is_active' => true,
         'email_verified_at' => Carbon::now(),
     ]);
-    $userRoleId = \DB::connection('mongodb_testing')->table('roles')->where('name', 'user')->value('id');
-    file_put_contents('/tmp/test_debug.log', "User role_id: " . ($userRoleId ?? 'NULL') . "\n", FILE_APPEND);
-    \DB::connection('mongodb_testing')->table('model_has_roles')->insert([
+    DB::connection('mongodb_testing')->table('roles')->where('name', 'user')->value('id');
+    DB::connection('mongodb_testing')->table('model_has_roles')->insert([
         'model_id' => $this->user->getKey(),
         'model_type' => User::class,
-        'role_id' => $userRoleId,
+        'role_id' => DB::connection('mongodb_testing')->table('roles')->where('name', 'user')->value('id'),
     ]);
 
     $this->seller = User::factory()->create([
@@ -50,12 +60,10 @@ beforeEach(function () {
         'is_active' => true,
         'email_verified_at' => Carbon::now(),
     ]);
-    $sellerRoleId = \DB::connection('mongodb_testing')->table('roles')->where('name', 'seller')->value('id');
-    file_put_contents('/tmp/test_debug.log', "Seller role_id: " . ($sellerRoleId ?? 'NULL') . "\n", FILE_APPEND);
-    \DB::connection('mongodb_testing')->table('model_has_roles')->insert([
+    DB::connection('mongodb_testing')->table('model_has_roles')->insert([
         'model_id' => $this->seller->getKey(),
         'model_type' => User::class,
-        'role_id' => $sellerRoleId,
+        'role_id' => DB::connection('mongodb_testing')->table('roles')->where('name', 'seller')->value('id'),
     ]);
 
     $this->admin = User::factory()->create([
@@ -66,49 +74,33 @@ beforeEach(function () {
         'is_active' => true,
         'email_verified_at' => Carbon::now(),
     ]);
-    $adminRoleId = \DB::connection('mongodb_testing')->table('roles')->where('name', 'admin')->value('id');
-    file_put_contents('/tmp/test_debug.log', "Admin role_id: " . ($adminRoleId ?? 'NULL') . " for admin_id: " . $this->admin->getKey() . "\n", FILE_APPEND);
-    \DB::connection('mongodb_testing')->table('model_has_roles')->insert([
+    DB::connection('mongodb_testing')->table('model_has_roles')->insert([
         'model_id' => $this->admin->getKey(),
         'model_type' => User::class,
-        'role_id' => $adminRoleId,
+        'role_id' => DB::connection('mongodb_testing')->table('roles')->where('name', 'admin')->value('id'),
     ]);
-
-    // Verify model_has_roles
-    $mhr = \DB::connection('mongodb_testing')->table('model_has_roles')->where('model_id', $this->admin->getKey())->first();
-    file_put_contents('/tmp/test_debug.log', "Admin model_has_roles: " . ($mhr ? 'EXISTS (role_id: ' . $mhr->role_id . ')' : 'NOT FOUND') . "\n", FILE_APPEND);
 
     $this->category = Category::factory()->create([
         'name' => 'Electronics',
         'slug' => 'electronics',
         'is_active' => true,
     ]);
-    
-    file_put_contents('/tmp/test_debug.log', "Category ID: " . $this->category->id . "\n", FILE_APPEND);
-    file_put_contents('/tmp/test_debug.log', "Category connection: " . $this->category->getConnectionName() . "\n", FILE_APPEND);
-    
-    $catExists = \DB::connection('mongodb_testing')->table('categories')->where('id', $this->category->id)->exists();
-    file_put_contents('/tmp/test_debug.log', "Category exists in mongodb_testing: " . ($catExists ? 'true' : 'false') . "\n", FILE_APPEND);
-    
-    file_put_contents('/tmp/test_debug.log', "=== beforeEach ENDED ===\n", FILE_APPEND);
 });
 
 afterEach(function () {
-    // Clean up test users to avoid data pollution between tests
     $testEmails = ['test@example.com', 'seller@example.com', 'admin@example.com', 'new@example.com'];
-    $userIds = \DB::connection('mongodb_testing')->table('users')->whereIn('email', $testEmails)->pluck('_id')->toArray();
-    
+    $userIds = DB::connection('mongodb_testing')->table('users')->whereIn('email', $testEmails)->pluck('_id')->toArray();
+
     if (!empty($userIds)) {
-        \DB::connection('mongodb_testing')->table('users')->whereIn('email', $testEmails)->delete();
-        \DB::connection('mongodb_testing')->table('personal_access_tokens')->whereIn('tokenable_id', $userIds)->delete();
-        \DB::connection('mongodb_testing')->table('model_has_roles')->whereIn('model_id', $userIds)->delete();
+        DB::connection('mongodb_testing')->table('users')->whereIn('email', $testEmails)->delete();
+        DB::connection('mongodb_testing')->table('personal_access_tokens')->whereIn('tokenable_id', $userIds)->delete();
+        DB::connection('mongodb_testing')->table('model_has_roles')->whereIn('model_id', $userIds)->delete();
     }
-    
-    // Clean up test products and auctions
-    \DB::connection('mongodb_testing')->table('products')->whereIn('seller_id', $userIds)->delete();
-    \DB::connection('mongodb_testing')->table('auctions')->whereIn('seller_id', $userIds)->delete();
-    \DB::connection('mongodb_testing')->table('bids')->whereIn('user_id', $userIds)->delete();
-    \DB::connection('mongodb_testing')->table('categories')->where('slug', 'electronics')->delete();
+
+    DB::connection('mongodb_testing')->table('products')->whereIn('seller_id', $userIds)->delete();
+    DB::connection('mongodb_testing')->table('auctions')->whereIn('seller_id', $userIds)->delete();
+    DB::connection('mongodb_testing')->table('bids')->whereIn('user_id', $userIds)->delete();
+    DB::connection('mongodb_testing')->table('categories')->where('slug', 'electronics')->delete();
 });
 
 describe('Authentication API', function () {
@@ -188,32 +180,20 @@ describe('Category API', function () {
     });
 
     test('admin can create category', function () {
-    echo "=== TEST STARTED ===" . PHP_EOL;
-    echo "Admin: " . ($this->admin ? $this->admin->getKey() : 'NULL') . PHP_EOL;
-    \Log::info('TEST STARTED', ['admin_id' => $this->admin?->getKey()]);
-    
-    // This will fail if beforeEach didn't run
-    if (!$this->admin) {
-        throw new \Exception("beforeEach did not run - admin is null");
-    }
-    
-    Sanctum::actingAs($this->admin);
-    
-    $response = $this->postJson('/api/v1/admin/categories', [
-        'name' => 'New Category',
-        'slug' => 'new-category',
-        'description' => 'Description',
-        'is_active' => true,
-    ]);
-    
-    echo "Status: " . $response->getStatusCode() . PHP_EOL;
-    echo "Response: " . $response->getContent() . PHP_EOL;
-    
-    $response->assertStatus(201)
-        ->assertJsonFragment(['name' => 'New Category']);
+        Sanctum::actingAs($this->admin);
 
-    expect(\App\Models\Category::where('slug', 'new-category')->exists())->toBeTrue();
-});
+        $response = $this->postJson('/api/v1/admin/categories', [
+            'name' => 'New Category',
+            'slug' => 'new-category',
+            'description' => 'Description',
+            'is_active' => true,
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonFragment(['name' => 'New Category']);
+
+        expect(Category::where('slug', 'new-category')->exists())->toBeTrue();
+    });
 
     test('non-admin cannot create category', function () {
         Sanctum::actingAs($this->user);
@@ -416,12 +396,10 @@ describe('Auction API', function () {
         $response = $this->getJson("/api/v1/auctions/{$auction->id}");
 
         $response->assertStatus(200)
-            ->assertJsonFragment(['id' => (string)$auction->id]);
+            ->assertJsonFragment(['id' => (string) $auction->id]);
     });
 
     test('seller can create auction for own product', function () {
-        die("TEST BODY REACHED");
-        file_put_contents(storage_path('logs/test_running.log'), "Test started\n", FILE_APPEND);
         $product = Product::factory()->create([
             'seller_id' => $this->seller->id,
             'category_id' => $this->category->id,
@@ -430,7 +408,7 @@ describe('Auction API', function () {
 
         Sanctum::actingAs($this->seller);
 
-$response = $this->postJson('/api/v1/auctions', [
+        $response = $this->postJson('/api/v1/auctions', [
             'product_id' => $product->id,
             'starting_price' => 100.00,
             'min_bid_increment' => 10.00,
@@ -438,8 +416,6 @@ $response = $this->postJson('/api/v1/auctions', [
             'start_date' => Carbon::now()->addMinutes(5)->toISOString(),
             'end_date' => Carbon::now()->addHours(24)->toISOString(),
         ]);
-
-        file_put_contents(storage_path('logs/test_running2.log'), "After postJson, status: " . $response->status() . "\n", FILE_APPEND);
 
         $response->assertStatus(201);
 

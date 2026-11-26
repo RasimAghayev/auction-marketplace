@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MongodbConnection;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -33,13 +34,18 @@ use function Illuminate\Support\enum_value;
  */
 class Role extends Model implements RoleContract
 {
-    use HasAssignedModels, HasPermissions, RefreshesPermissionCache, SoftDeletes;
+    use HasAssignedModels, HasPermissions, MongodbConnection, RefreshesPermissionCache, SoftDeletes;
 
     protected $collection = 'roles';
+
     protected $connection = 'mongodb';
+
     protected $primaryKey = '_id';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
+
     protected $guarded = [];
 
     public function __construct(array $attributes = [])
@@ -226,14 +232,5 @@ class Role extends Model implements RoleContract
 
         return $this->loadMissing('permissions')->permissions
             ->contains($permission->getKeyName(), $permission->getKey());
-    }
-
-    public function getConnectionName(): string
-    {
-        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
-            return 'mongodb_testing';
-        }
-
-        return 'mongodb';
     }
 }

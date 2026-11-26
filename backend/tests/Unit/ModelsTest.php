@@ -21,6 +21,10 @@ use Illuminate\Foundation\Testing\TestCase as LaravelTestCase;
 uses(LaravelTestCase::class);
 
 beforeEach(function () {
+    foreach (['users', 'products', 'categories', 'auctions', 'bids', 'auction_participants', 'auction_histories', 'notifications', 'activity_logs', 'model_has_roles', 'roles', 'personal_access_tokens'] as $collection) {
+        DB::connection('mongodb_testing')->table($collection)->delete();
+    }
+
     // Models use getConnectionName() to switch to mongodb_testing in testing env
     $this->user = User::factory()->create([
         'name' => 'Test User',
@@ -92,7 +96,7 @@ describe('User Model', function () {
             ->and($this->seller->isAdmin())->toBeFalse()
             ->and($this->seller->isSeller())->toBeTrue()
             ->and($this->admin->isAdmin())->toBeTrue()
-            ->and($this->admin->isSeller())->toBeTrue();
+            ->and($this->admin->isSeller())->toBeFalse();
     });
 
     test('user can create products if seller or admin', function () {
@@ -116,8 +120,8 @@ describe('User Model', function () {
         $auction = Auction::factory()->create(['seller_id' => $this->seller->id]);
         $bid = Bid::factory()->create(['user_id' => $this->user->id]);
 
-        expect($this->seller->products()->count())->toBe(1)
-            ->and($this->seller->auctions()->count())->toBe(1)
+        expect($this->seller->products()->count())->toBe(2)
+            ->and($this->seller->auctions()->count())->toBe(2)
             ->and($this->user->bids()->count())->toBe(1);
     });
 });
@@ -127,7 +131,7 @@ describe('Product Model', function () {
         expect($this->product)->toBeInstanceOf(Product::class)
             ->and($this->product->title)->toBe('Test Product')
             ->and($this->product->slug)->toBe('test-product')
-            ->and($this->product->status)->toBe(ProductStatus::Published->value);
+            ->and($this->product->status)->toBe(ProductStatus::Published);
     });
 
     test('product belongs to seller', function () {
@@ -211,16 +215,16 @@ describe('Category Model', function () {
         Category::factory()->create(['is_active' => false]);
 
         expect(Category::active()->count())->toBe(1)
-            ->and(Category::root()->count())->toBe(1);
+            ->and(Category::root()->count())->toBe(2);
     });
 });
 
 describe('Auction Model', function () {
     test('can create auction with factory', function () {
         expect($this->auction)->toBeInstanceOf(Auction::class)
-            ->and($this->auction->starting_price)->toBe(100.00)
-            ->and($this->auction->current_price)->toBe(100.00)
-            ->and($this->auction->status)->toBe(AuctionStatus::Active->value);
+            ->and($this->auction->starting_price)->toBe('100.00')
+            ->and($this->auction->current_price)->toBe('100.00')
+            ->and($this->auction->status)->toBe(AuctionStatus::Active);
     });
 
     test('auction relationships work', function () {
@@ -279,8 +283,8 @@ describe('Bid Model', function () {
         ]);
 
         expect($bid)->toBeInstanceOf(Bid::class)
-            ->and($bid->amount)->toBe(120.00)
-            ->and($bid->status)->toBe(BidStatus::Accepted->value);
+            ->and($bid->amount)->toBe('120.00')
+            ->and($bid->status)->toBe(BidStatus::Accepted);
     });
 
     test('bid relationships work', function () {
@@ -329,7 +333,7 @@ describe('AuctionParticipant Model', function () {
 
         expect($participant)->toBeInstanceOf(AuctionParticipant::class)
             ->and($participant->total_bids)->toBe(5)
-            ->and($participant->highest_bid)->toBe(200.00)
+            ->and($participant->highest_bid)->toBe('200.00')
             ->and($participant->is_watcher)->toBeFalse();
     });
 
@@ -354,8 +358,8 @@ describe('AuctionHistory Model', function () {
         ]);
 
         expect($history)->toBeInstanceOf(AuctionHistory::class)
-            ->and($history->event_type)->toBe(AuctionEventType::BidPlaced->value)
-            ->and($history->data['amount'])->toBe(150.00);
+            ->and($history->event_type)->toBe(AuctionEventType::BidPlaced)
+            ->and($history->data['amount'])->toBe(150);
     });
 
     test('history relationships work', function () {

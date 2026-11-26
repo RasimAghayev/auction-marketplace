@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MongodbConnection;
+use App\Models\Concerns\ObjectIdRouteBinding;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use MongoDB\Laravel\Eloquent\Model as MongoModel;
@@ -10,7 +12,7 @@ use Spatie\Activitylog\Support\LogOptions;
 
 abstract class BaseModel extends MongoModel
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity, MongodbConnection, ObjectIdRouteBinding, SoftDeletes;
 
     protected $guarded = [];
 
@@ -25,15 +27,6 @@ abstract class BaseModel extends MongoModel
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
-
-    public function getConnectionName(): string
-    {
-        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
-            return 'mongodb_testing';
-        }
-
-        return 'mongodb';
-    }
 
     public function getActivitylogOptions(): LogOptions
     {

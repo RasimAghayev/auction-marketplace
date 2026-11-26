@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AuctionStatus;
+use App\Enums\BidStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use MongoDB\Laravel\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
@@ -10,7 +11,7 @@ use Spatie\Activitylog\Support\LogOptions;
 
 class Auction extends BaseModel
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $collection = 'auctions';
 
@@ -53,16 +54,16 @@ class Auction extends BaseModel
     {
         return LogOptions::defaults()
             ->logOnly([
-                'product_id', 
-                'starting_price', 
-                'current_price', 
-                'min_bid_increment', 
-                'reserve_price', 
-                'start_date', 
-                'end_date', 
-                'status', 
-                'winner_id', 
-                'total_bids'
+                'product_id',
+                'starting_price',
+                'current_price',
+                'min_bid_increment',
+                'reserve_price',
+                'start_date',
+                'end_date',
+                'status',
+                'winner_id',
+                'total_bids',
             ])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
@@ -88,6 +89,11 @@ class Auction extends BaseModel
         return $this->hasMany(Bid::class, 'auction_id')->orderBy('created_at', 'desc');
     }
 
+    public function winningBid()
+    {
+        return $this->hasOne(Bid::class, 'auction_id')->where('status', BidStatus::Won->value);
+    }
+
     public function participants()
     {
         return $this->hasMany(AuctionParticipant::class, 'auction_id');
@@ -98,14 +104,19 @@ class Auction extends BaseModel
         return $this->hasMany(AuctionHistory::class, 'auction_id')->orderBy('created_at', 'desc');
     }
 
+    public function getRouteKeyName(): string
+    {
+        return '_id';
+    }
+
     public function isActive(): bool
     {
-        return $this->status === AuctionStatus::Active->value;
+        return $this->status === AuctionStatus::Active;
     }
 
     public function isScheduled(): bool
     {
-        return $this->status === AuctionStatus::Scheduled->value;
+        return $this->status === AuctionStatus::Scheduled;
     }
 
     public function isFinal(): bool
@@ -126,6 +137,7 @@ class Auction extends BaseModel
     public function isWithinAutoExtendThreshold(): bool
     {
         $threshold = config('auction.auto_extend_threshold_seconds', 60);
+
         return $this->end_date->diffInSeconds(now()) <= $threshold;
     }
 

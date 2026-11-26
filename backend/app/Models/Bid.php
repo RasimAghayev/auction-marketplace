@@ -39,6 +39,11 @@ class Bid extends BaseModel
             ->dontLogEmptyChanges();
     }
 
+    public function getRouteKeyName(): string
+    {
+        return '_id';
+    }
+
     public function auction()
     {
         return $this->belongsTo(Auction::class, 'auction_id');
@@ -51,7 +56,7 @@ class Bid extends BaseModel
 
     public function isWinning(): bool
     {
-        return $this->status === BidStatus::Winning->value;
+        return $this->status === BidStatus::Winning;
     }
 
     public function isActive(): bool

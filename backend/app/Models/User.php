@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\UserRole;
+use App\Models\Concerns\MongodbConnection;
+use App\Models\Concerns\ObjectIdRouteBinding;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Notifiable;
@@ -11,27 +14,16 @@ use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\HasApiTokens;
 use MongoDB\Laravel\Auth\User as MongoAuthenticatable;
 use MongoDB\Laravel\Eloquent\SoftDeletes;
-use Spatie\Permission\Traits\HasRoles;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
+use Spatie\Permission\Contracts\Role;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends MongoAuthenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles, SoftDeletes, LogsActivity;
+    use HasApiTokens, HasFactory, HasRoles, LogsActivity, MongodbConnection, Notifiable, ObjectIdRouteBinding, SoftDeletes;
 
     protected $collection = 'users';
-
-    /**
-     * Get the database connection for the model.
-     */
-    public function getConnectionName(): string
-    {
-        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
-            return 'mongodb_testing';
-        }
-
-        return 'mongodb';
-    }
 
     protected $fillable = [
         'name',
@@ -77,6 +69,11 @@ class User extends MongoAuthenticatable implements MustVerifyEmail
             ->dontLogEmptyChanges();
     }
 
+    public function getRouteKeyName(): string
+    {
+        return '_id';
+    }
+
     public function products()
     {
         return $this->hasMany(Product::class, 'seller_id');
@@ -116,7 +113,7 @@ class User extends MongoAuthenticatable implements MustVerifyEmail
             config('permission.column_names.model_morph_key'),
             'role_id'
         )->using(ModelHasRole::class)
-        ->withPivot('team_id');
+            ->withPivot('team_id');
     }
 
     public function permissions()
@@ -128,18 +125,18 @@ class User extends MongoAuthenticatable implements MustVerifyEmail
             config('permission.column_names.model_morph_key'),
             'permission_id'
         )->using(ModelHasPermission::class)
-        ->withPivot('team_id');
+            ->withPivot('team_id');
     }
 
     public function isAdmin(): bool
     {
-        return $this->role === \App\Enums\UserRole::Admin->value;
+        return $this->role === UserRole::Admin->value;
     }
 
     public function hasRole($roles, ?string $guard = null): bool
     {
         \Log::debug('User::hasRole called', ['roles' => $roles, 'guard' => $guard, 'user_id' => $this->getKey()]);
-        
+
         $roleModel = config('permission.models.role');
         $pivotTable = config('permission.table_names.model_has_roles');
         $morphKey = config('permission.column_names.model_morph_key');
@@ -181,7 +178,7 @@ class User extends MongoAuthenticatable implements MustVerifyEmail
                     $q->orWhere('id', $role);
                 } elseif (is_string($role)) {
                     $q->orWhere('name', $role);
-                } elseif ($role instanceof \Spatie\Permission\Contracts\Role) {
+                } elseif ($role instanceof Role) {
                     $q->orWhere('id', $role->getKey());
                 }
             }
@@ -192,12 +189,13 @@ class User extends MongoAuthenticatable implements MustVerifyEmail
     {
         // Flatten the roles array in case RoleMiddleware passes nested array
         $roles = array_merge([], ...$roles);
+
         return $this->hasRole($roles);
     }
 
     public function isSeller(): bool
     {
-        return $this->role === \App\Enums\UserRole::Seller->value;
+        return $this->role === UserRole::Seller->value;
     }
 
     public function canCreateProducts(): bool

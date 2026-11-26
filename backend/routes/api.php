@@ -1,21 +1,25 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\V1\AuthController;
-use App\Http\Controllers\Api\V1\UserController;
-use App\Http\Controllers\Api\V1\ProductController;
+use App\Http\Controllers\Api\V1\AdminAuctionController;
+use App\Http\Controllers\Api\V1\AdminCategoryController;
+use App\Http\Controllers\Api\V1\AdminController;
+use App\Http\Controllers\Api\V1\AdminProductController;
+use App\Http\Controllers\Api\V1\AdminUserController;
 use App\Http\Controllers\Api\V1\AuctionController;
+use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BidController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\DashboardController;
-use App\Http\Controllers\Api\V1\AdminController;
+use App\Http\Controllers\Api\V1\ProductController;
+use App\Http\Controllers\Api\V1\UserController;
+use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->group(function () {
+Route::prefix('v1')->middleware('throttle:api')->group(function () {
     // Public routes
-    Route::post('/auth/register', [AuthController::class, 'register']);
-    Route::post('/auth/login', [AuthController::class, 'login']);
-    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
-    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+    Route::post('/auth/register', [AuthController::class, 'register'])->middleware('rate.limit:5,1');
+    Route::post('/auth/login', [AuthController::class, 'login'])->middleware('rate.limit:10,1');
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('rate.limit:3,1');
+    Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('rate.limit:3,1');
     Route::get('/auth/verify-email/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
     Route::post('/auth/verification-notification', [AuthController::class, 'sendVerificationEmail'])->middleware('auth:sanctum');
 
@@ -40,6 +44,11 @@ Route::prefix('v1')->group(function () {
         Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
         Route::put('/auth/password', [AuthController::class, 'updatePassword']);
 
+        // User profiles
+        Route::get('/users/{user}', [UserController::class, 'show']);
+        Route::put('/users/{user}', [UserController::class, 'update']);
+        Route::put('/users/{user}/password', [UserController::class, 'updatePassword']);
+
         // User dashboard
         Route::get('/dashboard/overview', [DashboardController::class, 'overview']);
         Route::get('/dashboard/products', [DashboardController::class, 'products']);
@@ -57,13 +66,14 @@ Route::prefix('v1')->group(function () {
         Route::delete('/products/{product}/images/{image}', [ProductController::class, 'deleteImage']);
 
         // Auctions
-        Route::post('/auctions', [AuctionController::class, 'store']);
-        Route::put('/auctions/{auction}', [AuctionController::class, 'update']);
-        Route::post('/auctions/{auction}/start', [AuctionController::class, 'start']);
-        Route::post('/auctions/{auction}/cancel', [AuctionController::class, 'cancel']);
+        Route::post('/auctions', [AuctionController::class, 'store'])->middleware('rate.limit:10,1');
+        Route::put('/auctions/{auction}', [AuctionController::class, 'update'])->middleware('rate.limit:10,1');
+        Route::post('/auctions/{auction}/start', [AuctionController::class, 'start'])->middleware('rate.limit:10,1');
+        Route::post('/auctions/{auction}/cancel', [AuctionController::class, 'cancel'])->middleware('rate.limit:10,1');
+        Route::post('/auctions/{auction}/complete', [AuctionController::class, 'complete'])->middleware('rate.limit:10,1');
 
         // Bids
-        Route::post('/auctions/{auction}/bids', [BidController::class, 'store']);
+        Route::post('/auctions/{auction}/bids', [BidController::class, 'store'])->middleware('rate.limit:30,1');
         Route::get('/my-bids', [BidController::class, 'myBids']);
 
         // Notifications
@@ -75,17 +85,17 @@ Route::prefix('v1')->group(function () {
     // Admin routes
     Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
         Route::get('/dashboard', [AdminController::class, 'dashboard']);
-        Route::get('/users', [AdminController::class, 'users']);
-        Route::put('/users/{user}/suspend', [AdminController::class, 'suspendUser']);
-        Route::put('/users/{user}/unsuspend', [AdminController::class, 'unsuspendUser']);
-        Route::get('/products', [AdminController::class, 'products']);
-        Route::put('/products/{product}/moderate', [AdminController::class, 'moderateProduct']);
-        Route::get('/auctions', [AdminController::class, 'auctions']);
-        Route::put('/auctions/{auction}/manage', [AdminController::class, 'manageAuction']);
-        Route::get('/categories', [AdminController::class, 'categories']);
-        Route::post('/categories', [AdminController::class, 'storeCategory']);
-        Route::put('/categories/{category}', [AdminController::class, 'updateCategory']);
-        Route::delete('/categories/{category}', [AdminController::class, 'deleteCategory']);
+        Route::get('/users', [AdminUserController::class, 'index']);
+        Route::put('/users/{user}/suspend', [AdminUserController::class, 'suspend']);
+        Route::put('/users/{user}/unsuspend', [AdminUserController::class, 'unsuspend']);
+        Route::get('/products', [AdminProductController::class, 'index']);
+        Route::put('/products/{product}/moderate', [AdminProductController::class, 'moderate']);
+        Route::get('/auctions', [AdminAuctionController::class, 'index']);
+        Route::put('/auctions/{auction}/manage', [AdminAuctionController::class, 'manage']);
+        Route::get('/categories', [AdminCategoryController::class, 'index']);
+        Route::post('/categories', [AdminCategoryController::class, 'store']);
+        Route::put('/categories/{category}', [AdminCategoryController::class, 'update']);
+        Route::delete('/categories/{category}', [AdminCategoryController::class, 'destroy']);
         Route::get('/reports', [AdminController::class, 'reports']);
     });
 });

@@ -11,7 +11,7 @@ use Spatie\Activitylog\Support\LogOptions;
 
 class Product extends BaseModel
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $collection = 'products';
 
@@ -74,6 +74,7 @@ class Product extends BaseModel
                 return $image;
             }
         }
+
         return $images[0] ?? null;
     }
 

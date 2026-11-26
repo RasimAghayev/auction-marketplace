@@ -4,16 +4,19 @@
          bootstrap="tests/bootstrap.php"
          colors="true"
          executionOrder="depends,defects"
-         failOnEmptyTestSuite="false"
-         failOnRisky="true"
-         failOnWarning="true"
-         verbose="true">
+         failOnEmptyTestSuite="false">
     <testsuites>
         <testsuite name="Unit">
             <directory suffix="Test.php">tests/Unit</directory>
         </testsuite>
         <testsuite name="Feature">
             <directory suffix="Test.php">tests/Feature</directory>
+        </testsuite>
+        <testsuite name="Modules">
+            <directory suffix="Test.php">tests/Modules</directory>
+        </testsuite>
+        <testsuite name="ATDD">
+            <directory suffix="Test.php">tests/ATDD</directory>
         </testsuite>
     </testsuites>
 

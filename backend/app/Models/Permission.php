@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MongodbConnection;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -31,13 +32,18 @@ use function Illuminate\Support\enum_value;
  */
 class Permission extends Model implements PermissionContract
 {
-    use HasAssignedModels, RefreshesPermissionCache, SoftDeletes;
+    use HasAssignedModels, MongodbConnection, RefreshesPermissionCache, SoftDeletes;
 
     protected $collection = 'permissions';
+
     protected $connection = 'mongodb';
+
     protected $primaryKey = '_id';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
+
     protected $guarded = [];
 
     public function __construct(array $attributes = [])
@@ -215,14 +221,5 @@ class Permission extends Model implements PermissionContract
         }
 
         return true;
-    }
-
-    public function getConnectionName(): string
-    {
-        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
-            return 'mongodb_testing';
-        }
-
-        return 'mongodb';
     }
 }
