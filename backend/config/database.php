@@ -17,8 +17,8 @@ return [
             'driver' => 'mongodb',
             'dsn' => env('MONGODB_URI_TESTING', 'mongodb://mongodb:27017/?authSource=admin'),
             'database' => env('MONGODB_DATABASE_TESTING', 'auction_marketplace_testing'),
-            'username' => env('MONGODB_USERNAME_TESTING', 'admin'),
-            'password' => env('MONGODB_PASSWORD_TESTING', 'f841mu3Nmi1cUZme755cX/TCWyB13ZeHoohRUe3WqmQ='),
+            'username' => env('MONGODB_USERNAME_TESTING', 'admin') ?: null,
+            'password' => env('MONGODB_PASSWORD_TESTING', 'f841mu3Nmi1cUZme755cX/TCWyB13ZeHoohRUe3WqmQ=') ?: null,
             'options' => array_filter([
                 'replicaSet' => env('MONGODB_REPLICA_SET_TESTING', ''),
             ]),

@@ -47,6 +47,9 @@ jobs:
         env:
           APP_ENV: testing
           DB_CONNECTION: mongodb_testing
+          MONGODB_URI_TESTING: mongodb://localhost:27017
+          MONGODB_USERNAME_TESTING: ""
+          MONGODB_PASSWORD_TESTING: ""
 
   frontend-build:
     runs-on: ubuntu-latest
