@@ -1,11 +1,10 @@
 <?php
 
-use App\Models\User;
-use App\Models\Product;
-use App\Models\Category;
-use App\Enums\UserRole;
 use App\Enums\ProductStatus;
-use Laravel\Sanctum\Sanctum;
+use App\Enums\UserRole;
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\TestCase as LaravelTestCase;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +12,9 @@ use Illuminate\Support\Facades\DB;
 uses(LaravelTestCase::class);
 
 beforeEach(function () {
+    cleanTestDatabase();
+    seedTestRoles();
+
     $this->seller = User::factory()->create([
         'name' => 'Seller User',
         'email' => 'seller@example.com',

@@ -43,7 +43,6 @@ jobs:
         run: composer install --no-interaction --prefer-dist
       - name: Run tests
         working-directory: backend
-        continue-on-error: true
         run: vendor/bin/pest
         env:
           APP_ENV: testing
@@ -62,5 +61,22 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npx vite build
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+      - name: Composer audit
+        working-directory: backend
+        run: composer audit --locked
 
 

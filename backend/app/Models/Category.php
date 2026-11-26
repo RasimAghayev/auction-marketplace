@@ -2,16 +2,14 @@
 
 namespace App\Models;
 
-use App\Enums\ProductStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use MongoDB\BSON\ObjectId;
 use MongoDB\Laravel\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 class Category extends BaseModel
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $collection = 'categories';
 
@@ -80,18 +78,5 @@ class Category extends BaseModel
     public function getRouteKeyName(): string
     {
         return '_id';
-    }
-
-    public function resolveRouteBinding($value, $field = null)
-    {
-        if (is_string($value) && preg_match('/^[0-9a-fA-F]{24}$/', $value)) {
-            $category = static::where('_id', new ObjectId($value))->first();
-
-            if ($category) {
-                return $category;
-            }
-        }
-
-        return parent::resolveRouteBinding($value, $field);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\StoreBidRequest;
 use App\Http\Resources\Api\V1\BidResource;
 use App\Models\Auction;
 use App\Modules\Bids\Repositories\BidRepository;
@@ -27,14 +28,16 @@ class BidController extends Controller
         return BidResource::collection($bids);
     }
 
-    public function store(Request $request, Auction $auction): JsonResponse
+    public function store(StoreBidRequest $request, Auction $auction): JsonResponse
     {
-        $data = $request->validate([
-            'amount' => 'required|numeric|min:0.01',
-        ]);
+        if ($auction->seller_id === $request->user()->id) {
+            return response()->json([
+                'message' => 'You cannot bid on your own auction.',
+            ], 403);
+        }
 
         try {
-            $bid = $this->bids->place($auction, $request->user(), $data['amount']);
+            $bid = $this->bids->place($auction, $request->user(), $request->validated()['amount']);
         } catch (\DomainException $e) {
             return response()->json([
                 'message' => $e->getMessage(),

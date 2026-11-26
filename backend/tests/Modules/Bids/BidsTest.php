@@ -1,22 +1,23 @@
 <?php
 
-use App\Models\User;
-use App\Models\Product;
-use App\Models\Category;
-use App\Models\Auction;
-use App\Models\Bid;
-use App\Enums\UserRole;
-use App\Enums\ProductStatus;
 use App\Enums\AuctionStatus;
-use App\Enums\BidStatus;
-use Laravel\Sanctum\Sanctum;
+use App\Enums\ProductStatus;
+use App\Enums\UserRole;
+use App\Models\Auction;
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\TestCase as LaravelTestCase;
 use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\Sanctum;
 
 uses(LaravelTestCase::class);
 
 beforeEach(function () {
+    cleanTestDatabase();
+    seedTestRoles();
+
     $this->seller = User::factory()->create([
         'name' => 'Seller User',
         'email' => 'seller@example.com',
@@ -68,6 +69,7 @@ beforeEach(function () {
         'seller_id' => $this->seller->id,
         'status' => AuctionStatus::Active,
         'current_price' => 100.00,
+        'min_bid_increment' => 5.00,
         'start_date' => Carbon::now()->subMinutes(5),
         'end_date' => Carbon::now()->addHours(24),
     ]);
@@ -132,7 +134,7 @@ describe('Bids Module', function () {
         ]);
 
         $this->auction->refresh();
-        expect($this->auction->current_price)->toBe(110.00);
+        expect((float) $this->auction->current_price)->toBe(110.0);
     });
 
     test('bid total_bids count increments', function () {

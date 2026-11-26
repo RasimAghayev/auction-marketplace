@@ -2,17 +2,21 @@
 
 namespace App\Modules\Users\Services;
 
-use App\Models\User;
-use App\Models\Product;
-use App\Models\Auction;
-use App\Models\Category;
-use App\Enums\UserRole;
-use App\Enums\ProductStatus;
 use App\Enums\AuctionStatus;
+use App\Enums\BidStatus;
+use App\Enums\ProductStatus;
+use App\Enums\UserRole;
+use App\Models\Auction;
+use App\Models\Bid;
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\User;
+use App\Modules\Users\Repositories\UserRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
-use App\Modules\Users\Repositories\UserRepository;
 
 class UserService
 {
@@ -25,7 +29,7 @@ class UserService
         $user = $this->repository->findById($id);
 
         if (! $user) {
-            throw new \Illuminate\Database\Eloquent\ModelNotFoundException();
+            throw new ModelNotFoundException;
         }
 
         return $user->load('roles', 'permissions');
@@ -45,7 +49,12 @@ class UserService
         }
 
         $user->update(['password' => Hash::make($newPassword)]);
-        $user->tokens()->delete();
+
+        DB::connection($user->getConnectionName())
+            ->table('personal_access_tokens')
+            ->where('tokenable_id', (string) $user->getKey())
+            ->where('tokenable_type', $user->getMorphClass())
+            ->delete();
 
         return true;
     }
@@ -78,11 +87,7 @@ class UserService
             'categories_count' => Category::count(),
             'pending_products_count' => Product::where('status', ProductStatus::Draft->value)->count(),
             'active_auctions_count' => Auction::where('status', AuctionStatus::Active->value)->count(),
-            'revenue' => Auction::where('status', AuctionStatus::Completed->value)
-                ->whereNotNull('winning_bid_id')
-                ->with('winningBid')
-                ->get()
-                ->sum(fn($a) => $a->winningBid?->amount ?? 0),
+            'revenue' => (float) (string) Bid::where('status', BidStatus::Won->value)->sum('amount'),
         ];
     }
 }

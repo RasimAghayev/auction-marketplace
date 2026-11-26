@@ -2,17 +2,20 @@
 
 namespace App\Modules\Products\Repositories;
 
-use App\Enums\ProductStatus;
 use App\Models\Product;
+use App\Support\Concerns\ResolvesDatabaseConnection;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use MongoDB\BSON\ObjectId;
 
 class ProductRepository
 {
+    use ResolvesDatabaseConnection;
+
     public function findById(string $id): ?Product
     {
         if (preg_match('/^[0-9a-fA-F]{24}$/', $id)) {
-            return Product::where('_id', new \MongoDB\BSON\ObjectId($id))->first();
+            return Product::where('_id', new ObjectId($id))->first();
         }
 
         return Product::find($id);
@@ -26,11 +29,11 @@ class ProductRepository
     public function paginate(array $filters = []): LengthAwarePaginator
     {
         $query = Product::with(['category', 'seller'])
-            ->when($filters['status'] ?? null, fn($q) => $q->where('status', $filters['status']))
-            ->when($filters['category'] ?? null, fn($q) => $q->whereHas('category', fn($c) => $c->where('slug', $filters['category'])))
-            ->when($filters['search'] ?? null, fn($q) => $q->where('title', 'like', "%{$filters['search']}%"))
-            ->when($filters['seller_id'] ?? null, fn($q) => $q->where('seller_id', $filters['seller_id']))
-            ->scopePublished();
+            ->when($filters['status'] ?? null, fn ($q) => $q->where('status', $filters['status']))
+            ->when($filters['category'] ?? null, fn ($q) => $q->whereHas('category', fn ($c) => $c->where('slug', $filters['category'])))
+            ->when($filters['search'] ?? null, fn ($q) => $q->where('title', 'like', "%{$filters['search']}%"))
+            ->when($filters['seller_id'] ?? null, fn ($q) => $q->where('seller_id', $filters['seller_id']))
+            ->published();
 
         return $query->latest()->paginate($filters['per_page'] ?? 12);
     }
@@ -38,10 +41,10 @@ class ProductRepository
     public function adminPaginate(array $filters = []): LengthAwarePaginator
     {
         $query = Product::with(['category', 'seller'])
-            ->when($filters['status'] ?? null, fn($q) => $q->where('status', $filters['status']))
-            ->when($filters['category'] ?? null, fn($q) => $q->whereHas('category', fn($c) => $c->where('slug', $filters['category'])))
-            ->when($filters['search'] ?? null, fn($q) => $q->where('title', 'like', "%{$filters['search']}%"))
-            ->when($filters['seller_id'] ?? null, fn($q) => $q->where('seller_id', $filters['seller_id']));
+            ->when($filters['status'] ?? null, fn ($q) => $q->where('status', $filters['status']))
+            ->when($filters['category'] ?? null, fn ($q) => $q->whereHas('category', fn ($c) => $c->where('slug', $filters['category'])))
+            ->when($filters['search'] ?? null, fn ($q) => $q->where('title', 'like', "%{$filters['search']}%"))
+            ->when($filters['seller_id'] ?? null, fn ($q) => $q->where('seller_id', $filters['seller_id']));
 
         return $query->latest()->paginate($filters['per_page'] ?? 20);
     }
@@ -70,11 +73,6 @@ class ProductRepository
 
     public function categoryExists(string $categoryId): bool
     {
-        $connection = config('database.default');
-        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
-            $connection = 'mongodb_testing';
-        }
-
-        return DB::connection($connection)->table('categories')->where('_id', $categoryId)->exists();
+        return DB::connection($this->resolveConnection())->table('categories')->where('_id', $categoryId)->exists();
     }
 }

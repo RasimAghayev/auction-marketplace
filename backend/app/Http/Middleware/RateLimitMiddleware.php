@@ -11,13 +11,14 @@ class RateLimitMiddleware
 {
     public function handle(Request $request, Closure $next, int $maxAttempts = 60, float $decayMinutes = 1): Response
     {
-        $routeName = $request->route()?->getName() ?: $request->method() . ':' . $request->path();
-        $key = 'rate_limit:' . $request->ip() . ':' . $routeName;
+        $routeName = $request->route()?->getName() ?: $request->method().':'.$request->path();
+        $identity = $request->user()?->getAuthIdentifier() ?: $request->ip();
+        $key = 'rate_limit:'.$identity.':'.$routeName;
 
         $attempts = Cache::get($key, 0);
 
         if ($attempts >= $maxAttempts) {
-            $retryAfter = Cache::ttl($key);
+            $retryAfter = method_exists(Cache::getStore(), 'ttl') ? Cache::ttl($key) : null;
 
             return response()->json([
                 'message' => 'Too many requests. Please try again later.',
@@ -25,10 +26,10 @@ class RateLimitMiddleware
             ], 429);
         }
 
-        Cache::increment($key);
-
         if ($attempts === 0) {
-            Cache::put($key, $attempts + 1, now()->addMinutes($decayMinutes));
+            Cache::put($key, 1, now()->addMinutes($decayMinutes));
+        } else {
+            Cache::increment($key);
         }
 
         $response = $next($request);

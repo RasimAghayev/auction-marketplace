@@ -1,8 +1,12 @@
 <?php
 
+use App\Models\Auction;
+use App\Modules\Auctions\Services\AuctionService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
-use App\Modules\Auctions\Services\AuctionService;
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('sanctum:prune-expired')->daily();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -12,14 +16,14 @@ Artisan::command('auction:process-scheduled', function () {
     $service = app(AuctionService::class);
     $count = 0;
 
-    \App\Models\Auction::where('status', 'scheduled')
+    Auction::where('status', 'scheduled')
         ->where('start_date', '<=', now())
         ->each(function ($auction) use ($service, &$count) {
             try {
                 $service->start($auction);
                 $count++;
-            } catch (\DomainException $e) {
-                $this->warn("Auction {$auction->id}: " . $e->getMessage());
+            } catch (DomainException $e) {
+                $this->warn("Auction {$auction->id}: ".$e->getMessage());
             }
         });
 
@@ -30,7 +34,7 @@ Artisan::command('auction:auto-extend', function () {
     $service = app(AuctionService::class);
     $count = 0;
 
-    \App\Models\Auction::where('status', 'active')
+    Auction::where('status', 'active')
         ->each(function ($auction) use ($service, &$count) {
             if ($service->autoExtend($auction)) {
                 $count++;
@@ -44,14 +48,14 @@ Artisan::command('auction:close-expired', function () {
     $service = app(AuctionService::class);
     $count = 0;
 
-    \App\Models\Auction::where('status', 'active')
+    Auction::where('status', 'active')
         ->where('end_date', '<=', now())
         ->each(function ($auction) use ($service, &$count) {
             try {
                 $service->complete($auction);
                 $count++;
-            } catch (\DomainException $e) {
-                $this->warn("Auction {$auction->id}: " . $e->getMessage());
+            } catch (DomainException $e) {
+                $this->warn("Auction {$auction->id}: ".$e->getMessage());
             }
         });
 

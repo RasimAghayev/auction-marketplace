@@ -2,13 +2,13 @@
 
 namespace App\Modules\Auth\Services;
 
-use App\Models\User;
 use App\Enums\UserRole;
+use App\Models\User;
+use App\Modules\Auth\Repositories\AuthRepository;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use App\Modules\Auth\Repositories\AuthRepository;
 
 class AuthService
 {
@@ -44,6 +44,10 @@ class AuthService
 
         $token = $this->repository->createToken($user, 'api-token');
 
+        activity()->causedBy($user)->event('auth.login')
+            ->withProperties(['ip' => request()->ip()])
+            ->log('User logged in.');
+
         return [
             'user' => $user,
             'token' => $token,
@@ -52,6 +56,8 @@ class AuthService
 
     public function logout(User $user, ?string $tokenId = null): bool
     {
+        activity()->causedBy($user)->event('auth.logout')->log('User logged out.');
+
         return $this->repository->revokeTokens($user, $tokenId);
     }
 
@@ -67,9 +73,7 @@ class AuthService
         }
     }
 
-    public function sendVerificationEmail(User $user): void
-    {
-    }
+    public function sendVerificationEmail(User $user): void {}
 
     public function updateProfile(User $user, array $data): User
     {
@@ -92,6 +96,8 @@ class AuthService
 
         $this->repository->revokeTokens($user);
 
+        activity()->causedBy($user)->event('auth.password_updated')->log('Password updated.');
+
         return true;
     }
 
@@ -112,6 +118,8 @@ class AuthService
             $user->save();
 
             $this->repository->revokeTokens($user);
+
+            activity()->causedBy($user)->event('auth.password_reset')->log('Password reset.');
         });
 
         return $status === Password::PASSWORD_RESET;

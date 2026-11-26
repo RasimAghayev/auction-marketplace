@@ -2,12 +2,11 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MongodbConnection;
 use BackedEnum;
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Collection;
 use MongoDB\Laravel\Eloquent\Model;
 use MongoDB\Laravel\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Contracts\Activity as ActivityContract;
@@ -15,7 +14,7 @@ use Spatie\Activitylog\Enums\ActivityEvent;
 
 class Activity extends Model implements ActivityContract
 {
-    use SoftDeletes;
+    use MongodbConnection, SoftDeletes;
 
     public $guarded = [];
 
@@ -77,14 +76,5 @@ class Activity extends Model implements ActivityContract
     public function scopeForEvent(Builder $query, string|ActivityEvent $event): Builder
     {
         return $query->where('event', $event instanceof ActivityEvent ? $event->value : $event);
-    }
-
-    public function getConnectionName(): string
-    {
-        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
-            return 'mongodb_testing';
-        }
-
-        return 'mongodb';
     }
 }

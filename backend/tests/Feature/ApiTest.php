@@ -19,6 +19,24 @@ use Illuminate\Support\Facades\DB;
 uses(LaravelTestCase::class);
 
 beforeEach(function () {
+    foreach (['users', 'products', 'categories', 'auctions', 'bids', 'notifications', 'model_has_roles', 'personal_access_tokens'] as $collection) {
+        DB::connection('mongodb_testing')->table($collection)->delete();
+    }
+
+    foreach (['user', 'seller', 'admin'] as $roleName) {
+        $roleId = 'role_' . $roleName;
+        DB::connection('mongodb_testing')->table('roles')->updateOrInsert(
+            ['_id' => $roleId],
+            [
+                'id' => $roleId,
+                'name' => $roleName,
+                'guard_name' => 'sanctum',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
+            ]
+        );
+    }
+
     $this->user = User::factory()->create([
         'name' => 'Test User',
         'email' => 'test@example.com',

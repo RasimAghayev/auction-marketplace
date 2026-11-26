@@ -1,22 +1,26 @@
 <?php
 
-use App\Models\User;
-use App\Models\Product;
-use App\Models\Category;
-use App\Models\Auction;
-use App\Enums\UserRole;
-use App\Enums\ProductStatus;
 use App\Enums\AuctionStatus;
 use App\Enums\BidStatus;
-use Laravel\Sanctum\Sanctum;
+use App\Enums\ProductStatus;
+use App\Enums\UserRole;
+use App\Models\Auction;
+use App\Models\Bid;
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\User;
+use App\Modules\Auctions\Repositories\AuctionRepository;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\TestCase as LaravelTestCase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\Sanctum;
 
 uses(LaravelTestCase::class);
 
 beforeEach(function () {
+    cleanTestDatabase();
+    seedTestRoles();
     Cache::flush();
 
     $this->seller = User::factory()->create([
@@ -165,7 +169,7 @@ describe('Auctions Module', function () {
             'status' => AuctionStatus::Active,
         ]);
 
-        $activeAuctions = app(\App\Modules\Auctions\Services\AuctionService::class)->active();
+        $activeAuctions = app(AuctionRepository::class)->active();
 
         expect(count($activeAuctions))->toBeGreaterThan(0);
 

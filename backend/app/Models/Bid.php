@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Enums\BidStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use MongoDB\BSON\ObjectId;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -43,19 +42,6 @@ class Bid extends BaseModel
     public function getRouteKeyName(): string
     {
         return '_id';
-    }
-
-    public function resolveRouteBinding($value, $field = null)
-    {
-        if (is_string($value) && preg_match('/^[0-9a-fA-F]{24}$/', $value)) {
-            $bid = static::where('_id', new ObjectId($value))->first();
-
-            if ($bid) {
-                return $bid;
-            }
-        }
-
-        return parent::resolveRouteBinding($value, $field);
     }
 
     public function auction()

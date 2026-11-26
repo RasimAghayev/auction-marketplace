@@ -2,24 +2,30 @@
 
 namespace App\Modules\Categories\Repositories;
 
+use App\Enums\AuctionStatus;
 use App\Models\Auction;
 use App\Models\Category;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use MongoDB\BSON\ObjectId;
 
 class CategoryRepository
 {
     public function list(): Collection
     {
         $categories = Category::where('is_active', true)
+            ->withCount('products')
             ->orderBy('name')
             ->get();
 
+        $activeAuctionCounts = Auction::where('status', AuctionStatus::Active->value)
+            ->with('product')
+            ->get()
+            ->groupBy(fn (Auction $auction) => (string) ($auction->product->category_id ?? ''))
+            ->map(fn ($group) => $group->count());
+
         foreach ($categories as $category) {
-            $category->products_count = $category->products()->count();
-            $category->active_auctions_count = Auction::whereHas('product', function ($q) use ($category) {
-                $q->where('category_id', (string) $category->id);
-            })->where('status', 'active')->count();
+            $category->active_auctions_count = $activeAuctionCounts[(string) $category->id] ?? 0;
         }
 
         return $categories;
@@ -28,7 +34,7 @@ class CategoryRepository
     public function findById(string $id): ?Category
     {
         if (preg_match('/^[0-9a-fA-F]{24}$/', $id)) {
-            return Category::where('_id', new \MongoDB\BSON\ObjectId($id))->first();
+            return Category::where('_id', new ObjectId($id))->first();
         }
 
         return Category::find($id);
@@ -75,8 +81,8 @@ class CategoryRepository
     public function adminPaginate(array $filters = []): LengthAwarePaginator
     {
         $query = Category::with('children')
-            ->when($filters['search'] ?? null, fn($q) => $q->where('name', 'like', "%{$filters['search']}%"))
-            ->when($filters['is_active'] ?? null, fn($q) => $q->where('is_active', $filters['is_active']))
+            ->when($filters['search'] ?? null, fn ($q) => $q->where('name', 'like', "%{$filters['search']}%"))
+            ->when($filters['is_active'] ?? null, fn ($q) => $q->where('is_active', $filters['is_active']))
             ->whereNull('parent_id')
             ->latest();
 

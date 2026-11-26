@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\AuctionStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\StoreAuctionRequest;
+use App\Http\Requests\Api\V1\UpdateAuctionRequest;
 use App\Http\Resources\Api\V1\AuctionResource;
 use App\Models\Auction;
-use App\Enums\AuctionStatus;
 use App\Modules\Auctions\Repositories\AuctionRepository;
 use App\Modules\Auctions\Services\AuctionService;
-use Carbon\Carbon;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,7 +25,7 @@ class AuctionController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $auctions = $this->auctionRepository->paginate([
-            'status' => $request->status,
+            'status' => $request->status ?? AuctionStatus::Active->value,
             'per_page' => $request->integer('per_page', 12),
         ]);
 
@@ -36,7 +37,7 @@ class AuctionController extends Controller
         return new AuctionResource($auction->load(['product.category', 'seller', 'bids.user']));
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreAuctionRequest $request): JsonResponse
     {
         $productId = $request->input('product_id');
 
@@ -50,14 +51,7 @@ class AuctionController extends Controller
             ], 422);
         }
 
-        $data = $request->validate([
-            'product_id' => 'required',
-            'starting_price' => 'required|numeric|min:0.01',
-            'min_bid_increment' => 'required|numeric|min:0.01',
-            'reserve_price' => 'nullable|numeric|min:0',
-            'start_date' => 'required|date|after:now',
-            'end_date' => 'required|date|after:start_date',
-        ]);
+        $data = $request->validated();
 
         $auction = $this->auctions->create([
             ...$data,
@@ -71,19 +65,11 @@ class AuctionController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, Auction $auction): JsonResponse
+    public function update(UpdateAuctionRequest $request, Auction $auction): JsonResponse
     {
         $this->authorize('update', $auction);
 
-        $data = $request->validate([
-            'starting_price' => 'sometimes|numeric|min:0.01',
-            'min_bid_increment' => 'sometimes|numeric|min:0.01',
-            'reserve_price' => 'nullable|numeric|min:0',
-            'start_date' => 'sometimes|date',
-            'end_date' => 'sometimes|date|after:start_date',
-        ]);
-
-        $auction = $this->auctions->update($auction, $data);
+        $auction = $this->auctions->update($auction, $request->validated());
 
         return response()->json([
             'message' => 'Auction updated successfully.',

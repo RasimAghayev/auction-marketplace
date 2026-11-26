@@ -2,19 +2,20 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\MongodbConnection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Laravel\Sanctum\PersonalAccessToken as BasePersonalAccessToken;
-use MongoDB\Laravel\Eloquent\Model;
 
 class PersonalAccessToken extends BasePersonalAccessToken
 {
-    use HasFactory;
+    use HasFactory, MongodbConnection;
 
-    protected $connection = 'mongodb';
     protected $collection = 'personal_access_tokens';
 
     protected $primaryKey = '_id';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
 
     protected $fillable = [
@@ -38,15 +39,6 @@ class PersonalAccessToken extends BasePersonalAccessToken
         'token',
     ];
 
-    public function getConnectionName(): string
-    {
-        if (app()->environment('testing') || ($_ENV['APP_ENV'] ?? '') === 'testing' || (getenv('APP_ENV') ?? '') === 'testing') {
-            return 'mongodb_testing';
-        }
-
-        return 'mongodb';
-    }
-
     public function tokenable()
     {
         return $this->morphTo();
@@ -58,6 +50,7 @@ class PersonalAccessToken extends BasePersonalAccessToken
         $parts = explode('|', $token, 2);
         $plainTextToken = $parts[1] ?? $token;
         $hash = hash('sha256', $plainTextToken);
+
         return static::where('token', $hash)->first();
     }
 }

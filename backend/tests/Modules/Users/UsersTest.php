@@ -1,15 +1,18 @@
 <?php
 
-use App\Models\User;
 use App\Enums\UserRole;
-use Laravel\Sanctum\Sanctum;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\TestCase as LaravelTestCase;
 use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\Sanctum;
 
 uses(LaravelTestCase::class);
 
 beforeEach(function () {
+    cleanTestDatabase();
+    seedTestRoles();
+
     $this->user = User::factory()->create([
         'name' => 'Test User',
         'email' => 'test@example.com',

@@ -5,14 +5,13 @@ namespace App\Models;
 use App\Enums\AuctionStatus;
 use App\Enums\BidStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use MongoDB\BSON\ObjectId;
 use MongoDB\Laravel\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 class Auction extends BaseModel
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $collection = 'auctions';
 
@@ -55,16 +54,16 @@ class Auction extends BaseModel
     {
         return LogOptions::defaults()
             ->logOnly([
-                'product_id', 
-                'starting_price', 
-                'current_price', 
-                'min_bid_increment', 
-                'reserve_price', 
-                'start_date', 
-                'end_date', 
-                'status', 
-                'winner_id', 
-                'total_bids'
+                'product_id',
+                'starting_price',
+                'current_price',
+                'min_bid_increment',
+                'reserve_price',
+                'start_date',
+                'end_date',
+                'status',
+                'winner_id',
+                'total_bids',
             ])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
@@ -110,19 +109,6 @@ class Auction extends BaseModel
         return '_id';
     }
 
-    public function resolveRouteBinding($value, $field = null)
-    {
-        if (is_string($value) && preg_match('/^[0-9a-fA-F]{24}$/', $value)) {
-            $auction = static::where('_id', new ObjectId($value))->first();
-
-            if ($auction) {
-                return $auction;
-            }
-        }
-
-        return parent::resolveRouteBinding($value, $field);
-    }
-
     public function isActive(): bool
     {
         return $this->status === AuctionStatus::Active;
@@ -151,6 +137,7 @@ class Auction extends BaseModel
     public function isWithinAutoExtendThreshold(): bool
     {
         $threshold = config('auction.auto_extend_threshold_seconds', 60);
+
         return $this->end_date->diffInSeconds(now()) <= $threshold;
     }
 

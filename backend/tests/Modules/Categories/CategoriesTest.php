@@ -1,9 +1,17 @@
 <?php
 
 use App\Models\Category;
+use App\Models\User;
 use Illuminate\Foundation\Testing\TestCase as LaravelTestCase;
+use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\Sanctum;
 
 uses(LaravelTestCase::class);
+
+beforeEach(function () {
+    cleanTestDatabase();
+    seedTestRoles();
+});
 
 describe('Categories Module', function () {
     test('anyone can list active categories', function () {
@@ -28,7 +36,7 @@ describe('Categories Module', function () {
     });
 
     test('admin can create a category', function () {
-        $admin = \App\Models\User::factory()->create([
+        $admin = User::factory()->create([
             'name' => 'Admin',
             'email' => 'admin@example.com',
             'password' => 'password123',
@@ -36,17 +44,17 @@ describe('Categories Module', function () {
             'is_active' => true,
         ]);
 
-        $roleId = \Illuminate\Support\Facades\DB::connection('mongodb_testing')
+        $roleId = DB::connection('mongodb_testing')
             ->table('roles')->where('name', 'admin')->value('id');
 
-        \Illuminate\Support\Facades\DB::connection('mongodb_testing')
+        DB::connection('mongodb_testing')
             ->table('model_has_roles')->insert([
                 'model_id' => $admin->getKey(),
-                'model_type' => \App\Models\User::class,
+                'model_type' => User::class,
                 'role_id' => $roleId,
             ]);
 
-        Laravel\Sanctum\Sanctum::actingAs($admin);
+        Sanctum::actingAs($admin);
 
         $response = $this->postJson('/api/v1/admin/categories', [
             'name' => 'Books',
@@ -59,7 +67,7 @@ describe('Categories Module', function () {
     test('admin can update a category', function () {
         $category = Category::factory()->create(['name' => 'Old Name']);
 
-        $admin = \App\Models\User::factory()->create([
+        $admin = User::factory()->create([
             'name' => 'Admin',
             'email' => 'admin@example.com',
             'password' => 'password123',
@@ -67,17 +75,17 @@ describe('Categories Module', function () {
             'is_active' => true,
         ]);
 
-        $roleId = \Illuminate\Support\Facades\DB::connection('mongodb_testing')
+        $roleId = DB::connection('mongodb_testing')
             ->table('roles')->where('name', 'admin')->value('id');
 
-        \Illuminate\Support\Facades\DB::connection('mongodb_testing')
+        DB::connection('mongodb_testing')
             ->table('model_has_roles')->insert([
                 'model_id' => $admin->getKey(),
-                'model_type' => \App\Models\User::class,
+                'model_type' => User::class,
                 'role_id' => $roleId,
             ]);
 
-        Laravel\Sanctum\Sanctum::actingAs($admin);
+        Sanctum::actingAs($admin);
 
         $response = $this->putJson("/api/v1/admin/categories/{$category->id}", [
             'name' => 'New Name',
@@ -89,7 +97,7 @@ describe('Categories Module', function () {
     test('admin can delete a category without children', function () {
         $category = Category::factory()->create();
 
-        $admin = \App\Models\User::factory()->create([
+        $admin = User::factory()->create([
             'name' => 'Admin',
             'email' => 'admin@example.com',
             'password' => 'password123',
@@ -97,28 +105,28 @@ describe('Categories Module', function () {
             'is_active' => true,
         ]);
 
-        $roleId = \Illuminate\Support\Facades\DB::connection('mongodb_testing')
+        $roleId = DB::connection('mongodb_testing')
             ->table('roles')->where('name', 'admin')->value('id');
 
-        \Illuminate\Support\Facades\DB::connection('mongodb_testing')
+        DB::connection('mongodb_testing')
             ->table('model_has_roles')->insert([
                 'model_id' => $admin->getKey(),
-                'model_type' => \App\Models\User::class,
+                'model_type' => User::class,
                 'role_id' => $roleId,
             ]);
 
-        Laravel\Sanctum\Sanctum::actingAs($admin);
+        Sanctum::actingAs($admin);
 
         $response = $this->deleteJson("/api/v1/admin/categories/{$category->id}");
 
-        $response->assertStatus(200);
+        $response->assertStatus(204);
     });
 
     test('admin cannot delete a category with children', function () {
         $parent = Category::factory()->create();
         Category::factory()->create(['parent_id' => $parent->id]);
 
-        $admin = \App\Models\User::factory()->create([
+        $admin = User::factory()->create([
             'name' => 'Admin',
             'email' => 'admin@example.com',
             'password' => 'password123',
@@ -126,17 +134,17 @@ describe('Categories Module', function () {
             'is_active' => true,
         ]);
 
-        $roleId = \Illuminate\Support\Facades\DB::connection('mongodb_testing')
+        $roleId = DB::connection('mongodb_testing')
             ->table('roles')->where('name', 'admin')->value('id');
 
-        \Illuminate\Support\Facades\DB::connection('mongodb_testing')
+        DB::connection('mongodb_testing')
             ->table('model_has_roles')->insert([
                 'model_id' => $admin->getKey(),
-                'model_type' => \App\Models\User::class,
+                'model_type' => User::class,
                 'role_id' => $roleId,
             ]);
 
-        Laravel\Sanctum\Sanctum::actingAs($admin);
+        Sanctum::actingAs($admin);
 
         $response = $this->deleteJson("/api/v1/admin/categories/{$parent->id}");
 

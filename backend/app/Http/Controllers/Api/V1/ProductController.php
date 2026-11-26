@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\ProductStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\StoreProductRequest;
+use App\Http\Requests\Api\V1\UpdateProductRequest;
+use App\Http\Requests\Api\V1\UploadProductImagesRequest;
 use App\Http\Resources\Api\V1\ProductResource;
 use App\Models\Product;
-use App\Enums\ProductStatus;
 use App\Modules\Products\Repositories\ProductRepository;
 use App\Modules\Products\Services\ImageUploadService;
 use App\Modules\Products\Services\ProductService;
@@ -14,6 +17,8 @@ use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use OpenApi\Attributes as OA;
+use Symfony\Component\HttpFoundation\Response;
 
 class ProductController extends Controller
 {
@@ -24,6 +29,9 @@ class ProductController extends Controller
         protected ImageUploadService $imageUploadService
     ) {}
 
+    #[OA\Get(path: '/products', tags: ['Products'], summary: 'List published products', responses: [
+        new OA\Response(response: 200, description: 'Paginated product list'),
+    ])]
     public function index(Request $request): AnonymousResourceCollection
     {
         $products = $this->productRepository->paginate([
@@ -37,7 +45,7 @@ class ProductController extends Controller
 
     public function search(Request $request): AnonymousResourceCollection
     {
-        $products = $this->searchService->products($request->q, [
+        $products = $this->searchService->products($request->input('q', ''), [
             'category' => $request->category,
             'max_price' => $request->max_price,
             'min_price' => $request->min_price,
@@ -47,12 +55,21 @@ class ProductController extends Controller
         return ProductResource::collection($products);
     }
 
+    #[OA\Get(path: '/products/{product}', tags: ['Products'], summary: 'Show a product', responses: [
+        new OA\Response(response: 200, description: 'Product detail'),
+        new OA\Response(response: 404, description: 'Product not found'),
+    ])]
     public function show(Product $product): ProductResource
     {
         return new ProductResource($product->load(['category', 'seller', 'auction']));
     }
 
-    public function store(Request $request): JsonResponse
+    #[OA\Post(path: '/products', tags: ['Products'], summary: 'Create a product', security: [['bearerAuth' => []]], responses: [
+        new OA\Response(response: 201, description: 'Product created'),
+        new OA\Response(response: 401, description: 'Unauthenticated'),
+        new OA\Response(response: 422, description: 'Validation error'),
+    ])]
+    public function store(StoreProductRequest $request): JsonResponse
     {
         $categoryId = $request->input('category_id');
 
@@ -66,15 +83,8 @@ class ProductController extends Controller
             ], 422);
         }
 
-        $data = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'starting_price' => 'required|numeric|min:0',
-            'condition' => 'required|in:new,used,refurbished',
-        ]);
-
         $product = $this->products->create([
-            ...$data,
+            ...$request->validated(),
             'seller_id' => $request->user()->id,
             'status' => ProductStatus::Published->value,
         ]);
@@ -85,7 +95,13 @@ class ProductController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, Product $product): JsonResponse
+    #[OA\Put(path: '/products/{product}', tags: ['Products'], summary: 'Update a product', security: [['bearerAuth' => []]], responses: [
+        new OA\Response(response: 200, description: 'Product updated'),
+        new OA\Response(response: 401, description: 'Unauthenticated'),
+        new OA\Response(response: 403, description: 'Forbidden'),
+        new OA\Response(response: 422, description: 'Validation error'),
+    ])]
+    public function update(UpdateProductRequest $request, Product $product): JsonResponse
     {
         $this->authorize('update', $product);
 
@@ -100,15 +116,7 @@ class ProductController extends Controller
             ], 422);
         }
 
-        $data = $request->validate([
-            'title' => 'sometimes|string|max:255',
-            'description' => 'sometimes|string',
-            'starting_price' => 'sometimes|numeric|min:0',
-            'condition' => 'sometimes|in:new,used,refurbished',
-            'status' => 'sometimes|in:draft,published,in_auction,sold',
-        ]);
-
-        $product = $this->products->update($product, $data);
+        $product = $this->products->update($product, $request->validated());
 
         return response()->json([
             'message' => 'Product updated successfully.',
@@ -116,7 +124,13 @@ class ProductController extends Controller
         ]);
     }
 
-    public function destroy(Product $product): JsonResponse
+    #[OA\Delete(path: '/products/{product}', tags: ['Products'], summary: 'Delete a product', security: [['bearerAuth' => []]], responses: [
+        new OA\Response(response: 204, description: 'Product deleted'),
+        new OA\Response(response: 401, description: 'Unauthenticated'),
+        new OA\Response(response: 403, description: 'Forbidden'),
+        new OA\Response(response: 422, description: 'Cannot delete product with active auction'),
+    ])]
+    public function destroy(Product $product): Response
     {
         $this->authorize('delete', $product);
 
@@ -126,18 +140,11 @@ class ProductController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        return response()->json(['message' => 'Product deleted successfully.']);
+        return response()->noContent();
     }
 
-    public function uploadImages(Request $request, Product $product): JsonResponse
+    public function uploadImages(UploadProductImagesRequest $request, Product $product): JsonResponse
     {
-        $this->authorize('update', $product);
-
-        $request->validate([
-            'images' => 'required|array|max:' . ImageUploadService::MAX_FILES,
-            'images.*' => 'image|max:' . ImageUploadService::MAX_FILE_SIZE_KB,
-        ]);
-
         $uploaded = $this->imageUploadService->uploadMultiple(
             $request->file('images', [])
         );

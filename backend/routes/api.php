@@ -1,16 +1,20 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\V1\AuthController;
-use App\Http\Controllers\Api\V1\UserController;
-use App\Http\Controllers\Api\V1\ProductController;
+use App\Http\Controllers\Api\V1\AdminAuctionController;
+use App\Http\Controllers\Api\V1\AdminCategoryController;
+use App\Http\Controllers\Api\V1\AdminController;
+use App\Http\Controllers\Api\V1\AdminProductController;
+use App\Http\Controllers\Api\V1\AdminUserController;
 use App\Http\Controllers\Api\V1\AuctionController;
+use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BidController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\DashboardController;
-use App\Http\Controllers\Api\V1\AdminController;
+use App\Http\Controllers\Api\V1\ProductController;
+use App\Http\Controllers\Api\V1\UserController;
+use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->group(function () {
+Route::prefix('v1')->middleware('throttle:api')->group(function () {
     // Public routes
     Route::post('/auth/register', [AuthController::class, 'register'])->middleware('rate.limit:5,1');
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('rate.limit:10,1');
@@ -39,6 +43,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/auth/user', [AuthController::class, 'user']);
         Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
         Route::put('/auth/password', [AuthController::class, 'updatePassword']);
+
+        // User profiles
+        Route::get('/users/{user}', [UserController::class, 'show']);
+        Route::put('/users/{user}', [UserController::class, 'update']);
+        Route::put('/users/{user}/password', [UserController::class, 'updatePassword']);
 
         // User dashboard
         Route::get('/dashboard/overview', [DashboardController::class, 'overview']);
@@ -76,17 +85,17 @@ Route::prefix('v1')->group(function () {
     // Admin routes
     Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
         Route::get('/dashboard', [AdminController::class, 'dashboard']);
-        Route::get('/users', [AdminController::class, 'users']);
-        Route::put('/users/{user}/suspend', [AdminController::class, 'suspendUser']);
-        Route::put('/users/{user}/unsuspend', [AdminController::class, 'unsuspendUser']);
-        Route::get('/products', [AdminController::class, 'products']);
-        Route::put('/products/{product}/moderate', [AdminController::class, 'moderateProduct']);
-        Route::get('/auctions', [AdminController::class, 'auctions']);
-        Route::put('/auctions/{auction}/manage', [AdminController::class, 'manageAuction']);
-        Route::get('/categories', [AdminController::class, 'categories']);
-        Route::post('/categories', [AdminController::class, 'storeCategory']);
-        Route::put('/categories/{category}', [AdminController::class, 'updateCategory']);
-        Route::delete('/categories/{category}', [AdminController::class, 'deleteCategory']);
+        Route::get('/users', [AdminUserController::class, 'index']);
+        Route::put('/users/{user}/suspend', [AdminUserController::class, 'suspend']);
+        Route::put('/users/{user}/unsuspend', [AdminUserController::class, 'unsuspend']);
+        Route::get('/products', [AdminProductController::class, 'index']);
+        Route::put('/products/{product}/moderate', [AdminProductController::class, 'moderate']);
+        Route::get('/auctions', [AdminAuctionController::class, 'index']);
+        Route::put('/auctions/{auction}/manage', [AdminAuctionController::class, 'manage']);
+        Route::get('/categories', [AdminCategoryController::class, 'index']);
+        Route::post('/categories', [AdminCategoryController::class, 'store']);
+        Route::put('/categories/{category}', [AdminCategoryController::class, 'update']);
+        Route::delete('/categories/{category}', [AdminCategoryController::class, 'destroy']);
         Route::get('/reports', [AdminController::class, 'reports']);
     });
 });

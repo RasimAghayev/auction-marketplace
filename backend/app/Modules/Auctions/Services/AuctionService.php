@@ -7,17 +7,12 @@ use App\Enums\BidStatus;
 use App\Enums\ProductStatus;
 use App\Models\Auction;
 use App\Models\Bid;
-use App\Models\Product;
+use App\Modules\Auctions\Repositories\AuctionRepository;
 use App\Modules\Notifications\Services\NotificationService;
-use Carbon\Carbon;
 use DomainException;
-use Illuminate\Support\Facades\Cache;
 
 class AuctionService
 {
-    public const ACTIVE_AUCTIONS_CACHE_KEY = 'auctions:active';
-    public const ACTIVE_AUCTIONS_CACHE_TTL = 300;
-
     public function __construct(
         protected NotificationService $notificationService
     ) {}
@@ -32,7 +27,7 @@ class AuctionService
 
         $auction->product?->update(['status' => ProductStatus::InAuction]);
 
-        Cache::forget(self::ACTIVE_AUCTIONS_CACHE_KEY);
+        AuctionRepository::invalidateActiveCache();
 
         return $auction;
     }
@@ -41,20 +36,9 @@ class AuctionService
     {
         $auction->update($attributes);
 
-        Cache::forget(self::ACTIVE_AUCTIONS_CACHE_KEY);
+        AuctionRepository::invalidateActiveCache();
 
         return $auction;
-    }
-
-    public function active(): array
-    {
-        return Cache::remember(self::ACTIVE_AUCTIONS_CACHE_KEY, self::ACTIVE_AUCTIONS_CACHE_TTL, function () {
-            return Auction::where('status', AuctionStatus::Active->value)
-                ->with(['product.category', 'seller'])
-                ->latest()
-                ->get()
-                ->all();
-        });
     }
 
     public function start(Auction $auction): Auction
@@ -76,7 +60,7 @@ class AuctionService
             ['auction_id' => (string) $auction->id]
         );
 
-        Cache::forget(self::ACTIVE_AUCTIONS_CACHE_KEY);
+        AuctionRepository::invalidateActiveCache();
 
         return $auction;
     }
@@ -99,7 +83,7 @@ class AuctionService
             ['auction_id' => (string) $auction->id]
         );
 
-        Cache::forget(self::ACTIVE_AUCTIONS_CACHE_KEY);
+        AuctionRepository::invalidateActiveCache();
 
         return $auction;
     }
@@ -141,11 +125,12 @@ class AuctionService
             );
 
             // Notify seller
+            $winnerName = $winningBid->user->name ?? 'Unknown';
             $this->notificationService->createForUser(
                 $auction->seller_id,
                 'auction_completed',
                 'Auction completed',
-                "Your auction '{$auction->product->title}' has been completed. Winner: {$winningBid->user->name ?? 'Unknown'}",
+                "Your auction '{$auction->product->title}' has been completed. Winner: {$winnerName}",
                 ['auction_id' => (string) $auction->id, 'winning_bid_id' => (string) $winningBid->id, 'amount' => $winningBid->amount]
             );
         } else {
@@ -165,7 +150,7 @@ class AuctionService
             );
         }
 
-        Cache::forget(self::ACTIVE_AUCTIONS_CACHE_KEY);
+        AuctionRepository::invalidateActiveCache();
 
         return $auction;
     }
@@ -179,7 +164,7 @@ class AuctionService
         $threshold = config('auction.auto_extend_threshold_seconds', 60);
         $extendDuration = config('auction.auto_extend_duration_seconds', 300);
 
-        $remaining = $auction->end_date->diffInSeconds(now());
+        $remaining = now()->diffInSeconds($auction->end_date);
 
         if ($remaining > 0 && $remaining <= $threshold) {
             $auction->update([
@@ -187,7 +172,7 @@ class AuctionService
                 'version' => ($auction->version ?? 0) + 1,
             ]);
 
-            Cache::forget(self::ACTIVE_AUCTIONS_CACHE_KEY);
+            AuctionRepository::invalidateActiveCache();
 
             return $auction;
         }

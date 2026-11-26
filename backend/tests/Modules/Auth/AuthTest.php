@@ -11,6 +11,25 @@ use Illuminate\Support\Facades\DB;
 uses(LaravelTestCase::class);
 
 beforeEach(function () {
+    DB::connection('mongodb_testing')->table('users')->delete();
+    DB::connection('mongodb_testing')->table('model_has_roles')->delete();
+    DB::connection('mongodb_testing')->table('roles')->delete();
+    DB::connection('mongodb_testing')->table('personal_access_tokens')->delete();
+
+    foreach (['user', 'admin'] as $roleName) {
+        $roleId = 'role_' . $roleName;
+        DB::connection('mongodb_testing')->table('roles')->updateOrInsert(
+            ['_id' => $roleId],
+            [
+                'id' => $roleId,
+                'name' => $roleName,
+                'guard_name' => 'sanctum',
+                'created_at' => Carbon::now(),
+                'updated_at' => Carbon::now(),
+            ]
+        );
+    }
+
     $this->user = User::factory()->create([
         'name' => 'Test User',
         'email' => 'test@example.com',
@@ -49,7 +68,8 @@ describe('Auth Module', function () {
         $response = $this->postJson('/api/v1/auth/register', [
             'name' => 'New User',
             'email' => 'newuser@example.com',
-            'password' => 'password123',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
         ]);
 
         $response->assertStatus(201);
@@ -66,7 +86,8 @@ describe('Auth Module', function () {
         $response = $this->postJson('/api/v1/auth/register', [
             'name' => 'Duplicate',
             'email' => 'test@example.com',
-            'password' => 'password123',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
         ]);
 
         $response->assertStatus(422);
@@ -133,8 +154,8 @@ describe('Auth Module', function () {
 
         $response = $this->putJson('/api/v1/auth/password', [
             'current_password' => 'password123',
-            'password' => 'newpassword123',
-            'password_confirmation' => 'newpassword123',
+            'password' => 'NewPassword123!',
+            'password_confirmation' => 'NewPassword123!',
         ]);
 
         $response->assertStatus(200);
@@ -145,8 +166,8 @@ describe('Auth Module', function () {
 
         $response = $this->putJson('/api/v1/auth/password', [
             'current_password' => 'wrongpassword',
-            'password' => 'newpassword123',
-            'password_confirmation' => 'newpassword123',
+            'password' => 'NewPassword123!',
+            'password_confirmation' => 'NewPassword123!',
         ]);
 
         $response->assertStatus(422);
